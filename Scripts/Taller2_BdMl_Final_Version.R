@@ -315,7 +315,7 @@ train <- train |>
   mutate(Pobre   = factor(Pobre,levels=c(0,1))
   )
 
-# 3. Modelo sin balanceo de muestras =================
+# 3. Modelo RF sin balanceo de muestras =================
 
 ctrl <- trainControl(
   method = "cv",
@@ -337,7 +337,7 @@ model_rf <- train(
 
 
 
-# 3.2 Modelo con Down-Sampling N_tree 100 =================
+# 3.2.1 Modelo RF con Down-Sampling N_tree 100 =================
 # Definir función F1 para la CV INTERNA
 
 f1_summary <- function(data, lev = NULL, model = NULL) {
@@ -401,7 +401,7 @@ confusion_matrix <- confusionMatrix(predicciones_model_rf_fast_down, train$Pobre
 print(confusion_matrix)
 
 
-# 3.2.1 Modelo con Smoote-Sampling N_tree 100 =================
+# 3.2.2 Modelo RF con Smoote-Sampling N_tree 100 =================
 # Definir función F1 para la CV INTERNA
 
 
@@ -466,7 +466,7 @@ predicciones_model_rf_fast <- predict(model_rf_fast, newdata = train)
 confusion_matrix <- confusionMatrix(model_rf_fast, train$Pobre)
 print(confusion_matrix)
 
-# 3.2.2 Modelo con Up-Sampling N_tree 150 =================
+# 3.2.3 Modelo  RF con Up-Sampling N_tree 150 =================
 
 f1_summary <- function(data, lev = NULL, model = NULL) {
   confusion <- caret::confusionMatrix(data$pred, data$obs)
@@ -528,7 +528,7 @@ write.csv(submission_up, ruta_completa, row.names = FALSE)
 
 
 
-# 3.3 Modelo con Down-Sampling N_tree 150 ===============
+# 3.3.4 Modelo RF con Down-Sampling N_tree 150 ===============
 
 # Función F1 personalizada que penaliza más los Falsos Negativos
 f1_weighted <- function(data, lev = NULL, model = NULL) {
@@ -611,7 +611,7 @@ print(confusion_matrix)
 
 
 
-# Modelo 3.5 con Boosting ==============
+# 3.3.5 Modelo con Boosting ==============
 p_load(xgboost)
 
 # Calcular peso para clase minoritaria
@@ -640,136 +640,7 @@ predicciones_model_xgb <- predict(model_xgb, newdata = train)
 confusion_matrix <- confusionMatrix(predicciones_model_xgb, train$Pobre)
 print(confusion_matrix)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# MOdelo 3.6 =========
-p_load(caret, DMwR)
-
-set.seed(2025)
-
-ctrl <- trainControl(
-  method = "cv",
-  number = 3,
-  savePredictions = FALSE ,   # solo guarda las finales
-  classProbs = FALSE,          # desactiva cálculo de probabilidades
-  sampling = "smote",            # puedes usar "down", "up" o "smote" si hay desbalance
-  verboseIter = FALSE 
-)
-
-model_rf <- train(
-  Pobre ~ .,
-  data = train,
-  method = "rf",
-  trControl = ctrl,
-  metric = "Accuracy",         # métrica simple, más rápida
-  tuneGrid = expand.grid(mtry = c(3, 5, 7)),
-  ntree= 100,
-  importance = FALSE, do.trace = FALSE
-)
-
-
-
-predicciones_model_rf <- predict(model_rf, newdata = train)
-confusion_matrix <- confusionMatrix(predicciones_model_xgb, train$Pobre)
-print(confusion_matrix)
-
-
-# 4. Sección de análisis de datos =============
-
-p_load(broom, ggplot2)
-
-# Estadísticas descriptivas por grupo de pobreza
-estadisticas <- train %>%
-  group_by(Pobre) %>%
-  summarise(
-    Nper_mean = mean(Nper, na.rm = TRUE),
-    prop_ocupados_mean = mean(prop_ocupados, na.rm = TRUE),
-    prop_inactivos_mean = mean(prop_inactivos, na.rm = TRUE),
-    prop_cotizantes_mean = mean(prop_cotizantes, na.rm = TRUE),
-    cat_maxEduc_mean = mean(cat_maxEduc, na.rm = TRUE),
-    prop_cuartos_mean = mean(prop_cuartos, na.rm = TRUE)
-  )
-
-# Promedios totales
-totales <- train %>%
-  summarise(
-    Nper_total = mean(Nper, na.rm = TRUE),
-    prop_ocupados_total = mean(prop_ocupados, na.rm = TRUE),
-    prop_inactivos_total = mean(prop_inactivos, na.rm = TRUE),
-    prop_cotizantes_total = mean(prop_cotizantes, na.rm = TRUE),
-    cat_maxEduc_total = mean(cat_maxEduc, na.rm = TRUE),
-    prop_cuartos_total = mean(prop_cuartos, na.rm = TRUE)
-  )
-
-# 3. Pruebas de significancia (t-test)
-variables_test <- c("Nper", "prop_ocupados", "prop_inactivos", 
-                    "prop_cotizantes", "cat_maxEduc", "prop_cuartos")
-
-pruebas_significancia <- list()
-for(var in variables_test) {
-  formula <- as.formula(paste(var, "~ Pobre"))
-  prueba <- t.test(formula, data = train)
-  pruebas_significancia[[var]] <- tidy(prueba)
-}
-
-# 4. Resultados para exportar
-estadisticas
-totales
-pruebas_significancia
-
-# Variable objetivo:
-# Calcular frecuencias y porcentajes
-frecuencias <- table(train$Pobre)
-porcentajes <- prop.table(frecuencias) * 100
-
-# Crear etiquetas para las barras
-# Modificar solo esta línea:
-etiquetas <- paste0(format(frecuencias, big.mark = ".", decimal.mark = ","), 
-                    "\n(", round(porcentajes, 1), "%)")
-# Gráfico con frecuencias y porcentajes
-barplot(frecuencias,
-        main = "Distribución de la Variable Objetivo: Pobreza",
-        xlab = "Condición de Pobreza", 
-        ylab = "Número de Hogares",
-        col = c("gray70", "gray40"),
-        names.arg = c("No Pobre (0)", "Pobre (1) "),
-        ylim = c(0, max(frecuencias) * 1.1),
-        border = "black")
-
-# Agregar etiquetas encima de las barras
-text(x = c(0.7, 1.9), 
-     y = frecuencias + max(frecuencias) * 0.05,
-     labels = etiquetas,
-     cex = 0.8)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 3.5 Modelo Boosting Trashehold 0.3 ===========
+# 3.3.6 Modelo Boosting Trashehold 0.3 ===========
 
 
 train$Pobre <- factor(ifelse(train$Pobre == 1, "Pobre", "NoPobre"),
@@ -982,7 +853,7 @@ write.csv(submission_xgb, ruta_completa, row.names = FALSE)
 
 
 
-# Modelo solo con top 8 variables ===========
+# 3.3.7 Modelo solo con top 8 variables ===========
 vars_top <- c("Pobre", "prop_cotizantes", "prop_cuartos", "prop_ocupados", 
               "num_cotizantes", "tiene_vivienda", "cat_maxEduc", 
               "prop_cuartos_dormir", "Nivel_educ")
@@ -1034,8 +905,7 @@ write.csv(submission_top, "C:/Users/Marlon Angulo/Downloads/XGB_top_variables_th
 
 
 
-# Modelo con variables avanzadas ==========
-
+# 3.3.8 Modelo con variables avanzadas ==========
 
 
 # Crear nuevas variables basadas en las relaciones más importantes
@@ -1274,216 +1144,7 @@ write.csv(submission_final, "C:/Users/Marlon Angulo/Downloads/XGB_enhanced_ensem
 
 
 
-# Modelo final ============
-
-# Tu modelo original que dio 0.65 - pero con las nuevas features
-set.seed(2025)
-model_original_enhanced <- train(
-  Pobre ~ .,
-  data = train,  # Usar TODOS los datos, no solo estratificados
-  method = "xgbTree",
-  trControl = trainControl(method = "cv", number = 3, classProbs = TRUE),
-  tuneGrid = expand.grid(
-    nrounds = 100,
-    max_depth = 6,
-    eta = 0.1,
-    gamma = 0,
-    colsample_bytree = 0.8,
-    min_child_weight = 1,
-    subsample = 0.8
-  ),
-  verbose = FALSE
-)
-
-
-
-prob_train_enhanced <- predict(model_original_enhanced, train, type = "prob")
-pred_train_enhanced <- ifelse(prob_train_enhanced$Pobre > 0.3, "Pobre", "NoPobre")
-pred_train_enhanced <- factor(pred_train_enhanced, levels = c("NoPobre", "Pobre"))
-
-confusion_train_enhanced <- confusionMatrix(pred_train_enhanced, train$Pobre)
-print(confusion_train_enhanced)
-
-
-
-
-
-
-
-
-
-
-
-# Probar en test
-prob_original <- predict(model_original_enhanced, test_enhanced, type = "prob")
-pred_original <- ifelse(prob_original$Pobre > 0.3, 1, 0)
-
-submission_original <- data.frame(id = test$id, poverty = pred_original)
-write.csv(submission_original, "C:/Users/Marlon Angulo/Downloads/XGB_original_enhanced.csv", row.names = FALSE)
-
-# Modelo optimizando metrica Kaggle =========
-
-train_original_backup <- train
-
-# Balanceo 50/50 para que el modelo aprenda ambos patrones por igual
-train_balanced <- train_original_backup %>%
-  group_by(Pobre) %>%
-  sample_n(min(n(), 6000)) %>%  # 6000 de cada clase
-  ungroup()
-
-print(table(train_balanced$Pobre))
-
-train <- train_balanced
-
-print("Dataset listo para feature engineering:")
-print(table(train$Pobre))
-
-
-# Featuring avanzado
-
-# Feature engineering avanzado - versión compacta
-advanced_feature_engineering <- function(data) {
-  data <- data %>%
-    mutate(
-      # Ratios económicos clave
-      dependency_ratio = (num_minors + num_inactivos) / (num_occupied + 0.1),
-      educ_occupation_gap = cat_maxEduc / (prop_ocupados + 0.1),
-      financial_inclusion = num_cotizantes / (Nper + 0.1),
-      
-      # Interacciones no lineales
-      vulnerability_employment = vulnerability_index * (1 - prop_ocupados),
-      minors_financial_stress = num_minors * (1 - financial_inclusion),
-      
-      # Severidad de hacinamiento
-      overcrowding_severity = case_when(
-        prop_cuartos < 0.25 ~ 3,
-        prop_cuartos < 0.5 ~ 2,
-        TRUE ~ 1
-      )
-    )
-  return(data)
-}
-
-# Aplicar a train y test
-train <- advanced_feature_engineering(train)
-test <- advanced_feature_engineering(test)
-
-# Verificar
-print("Nuevas variables creadas:")
-print(names(train)[(ncol(train)-5):ncol(train)])
-
-
-# Optimización final:
-
-# Optimización final de modelos
-
-# 1. Configuración robusta de entrenamiento
-ctrl_robust <- trainControl(
-  method = "cv",
-  number = 5,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary,
-  verboseIter = FALSE
-)
-
-# 2. Grid de hiperparámetros optimizado
-tune_grid_xgb <- expand.grid(
-  nrounds = c(100, 150),
-  max_depth = c(4, 6),
-  eta = c(0.1, 0.3),
-  gamma = c(0, 1),
-  colsample_bytree = c(0.7, 0.8),
-  min_child_weight = c(3, 5),
-  subsample = c(0.8, 0.9)
-)
-
-# 3. Entrenar modelo optimizado
-
-train$Pobre <- factor(ifelse(train$Pobre == 1, "Pobre", "NoPobre"),
-                      levels = c("NoPobre", "Pobre"))
-
-set.seed(2025)
-model_xgb_optimized <- train(
-  Pobre ~ .,
-  data = train,
-  method = "xgbTree",
-  trControl = ctrl_robust,
-  tuneGrid = tune_grid_xgb,
-  metric = "ROC",
-  verbose = FALSE
-)
-
-# 4. Mejores parámetros
-print("Mejores parámetros encontrados:")
-print(model_xgb_optimized$bestTune)
-
-# 5. Optimizar threshold con F1
-optimizar_threshold <- function(modelo, datos, verdad) {
-  probs <- predict(modelo, datos, type = "prob")$Pobre
-  thresholds <- seq(0.1, 0.5, by = 0.02)
-  f1_scores <- sapply(thresholds, function(th) {
-    preds <- ifelse(probs > th, "Pobre", "NoPobre")
-    preds <- factor(preds, levels = c("NoPobre", "Pobre"))
-    conf_matrix <- confusionMatrix(preds, verdad)
-    conf_matrix$byClass["F1"]
-  })
-  best_threshold <- thresholds[which.max(f1_scores)]
-  return(best_threshold)
-}
-
-best_threshold <- optimizar_threshold(model_xgb_optimized, train, train$Pobre)
-print(paste("Mejor threshold:", round(best_threshold, 3)))
-
-# Evaluar el modelo en train con el threshold óptimo
-probabilidades_train <- predict(model_xgb_optimized, train, type = "prob")
-predicciones_train <- ifelse(probabilidades_train$Pobre > best_threshold, "Pobre", "NoPobre")
-predicciones_train <- factor(predicciones_train, levels = c("NoPobre", "Pobre"))
-
-# Matriz de confusión
-confusion_final <- confusionMatrix(predicciones_train, train$Pobre)
-
-print(confusion_final)
-
-# Predecir en test y guardar en Downloads
-probabilidades_test <- predict(model_xgb_optimized, test, type = "prob")
-predicciones_test <- ifelse(probabilidades_test$Pobre > 0.5, "Pobre", "NoPobre")
-
-# Obtener los mejores hiperparámetros
-best_params <- model_xgb_optimized$bestTune
-
-# Crear nombre descriptivo según convención
-nombre_archivo <- paste0(
-  "XGB",
-  "_nrounds_", best_params$nrounds,
-  "_maxdepth_", best_params$max_depth,
-  "_eta_", best_params$eta,
-  "_gamma_", best_params$gamma,
-  "_colsample_", best_params$colsample_bytree,
-  "_minchild_", best_params$min_child_weight,
-  "_subsample_", best_params$subsample,
-  "_threshold_05.csv"
-)
-
-# Ruta completa a Downloads
-ruta_descargas <- "C:/Users/Marlon Angulo/Downloads"
-ruta_completa <- file.path(ruta_descargas, nombre_archivo)
-
-# Submission final
-submission_final <- data.frame(
-  id = test$id,
-  poverty = as.numeric(predicciones_test == "Pobre")
-)
-
-# Guardar
-write.csv(submission_final, ruta_completa, row.names = FALSE)
-print(paste("Submission guardado en:", ruta_completa))
-print("Hiperparámetros utilizados:")
-print(best_params)
-
-
-
-
-# Modelo Optimizado 0.70 ========
+# Modelo Final XGB Optimizado 0.70 (Mejor modelo) ========
 # ENRIQUECIMIENTO MASIVO DE VARIABLES DESDE DATOS ORIGINALES
 
 cat("🚀 AGREGANDO 50+ VARIABLES NUEVAS DESDE DATOS ORIGINALES\n")
@@ -1699,9 +1360,7 @@ model_enriched_improved <- train(
 table(train_enriched$Pobre)
 
 
-
-
-# VER RESULTADOS DEL MODELO ORIGINAL CON THRESHOLD 0.4
+# VER RESULTADOS DEL MODELO ORIGINAL CON THRESHOLD 0.33
 prob_original <- predict(model_enriched_improved, train_enriched_final, type = "prob")$Pobre
 pred_original <- ifelse(prob_original > 0.33, "Pobre", "NoPobre")
 cm_original <- confusionMatrix(factor(pred_original, levels = c("NoPobre", "Pobre")), 
@@ -1727,30 +1386,54 @@ cat("- Recall Pobre:", round(recall_pobre_correct, 4), "\n")
 cat("- F1 Pobre:", round(f1_pobre_correct, 4), "\n")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #En teoría es mejor con 0.34
 prob_train <- predict(model_enriched_improved, train_enriched_final, type = "prob")$Pobre
 pred_train <- ifelse(prob_train > 0.34, "Pobre", "NoPobre")
 confusionMatrix(factor(pred_train, levels = c("NoPobre", "Pobre")), train_enriched_final$Pobre)
 
+
+# BUCLE PARA ENCONTRAR THRESHOLD ÓPTIMO QUE MAXIMIZA F1-SCORE
+prob_train <- predict(model_enriched_improved, train_enriched_final, type = "prob")$Pobre
+
+# Probar diferentes thresholds
+thresholds <- seq(0.1, 0.5, by = 0.01)
+results <- data.frame(threshold = numeric(), 
+                      f1_score = numeric(),
+                      recall = numeric(),
+                      precision = numeric(),
+                      TP = numeric(),
+                      FP = numeric(),
+                      FN = numeric())
+
+for (th in thresholds) {
+  pred_temp <- ifelse(prob_train > th, "Pobre", "NoPobre")
+  cm_temp <- confusionMatrix(factor(pred_temp, levels = c("NoPobre", "Pobre")), 
+                             train_enriched_final$Pobre)
+  
+  # Calcular métricas para clase "Pobre"
+  TP <- cm_temp$table[2, 2]
+  FP <- cm_temp$table[2, 1]
+  FN <- cm_temp$table[1, 2]
+  
+  precision <- TP / (TP + FP)
+  recall <- TP / (TP + FN)
+  f1_score <- 2 * (precision * recall) / (precision + recall)
+  
+  # Guardar resultados
+  results <- rbind(results, data.frame(
+    threshold = th,
+    f1_score = f1_score,
+    recall = recall,
+    precision = precision,
+    TP = TP,
+    FP = FP,
+    FN = FN
+  ))
+}
+
+# Encontrar el threshold óptimo
+optimal_threshold <- results[which.max(results$f1_score), ]
+print(optimal_threshold)
 
 
 # 1. Modelo F1 0.7083 (threshold 0.34)
@@ -1764,31 +1447,7 @@ submission_1 <- data.frame(
 
 write.csv(submission_1, paste0(output_path, "XGB_threshold_034_depth_6_eta_01_gamma_1.csv"), row.names = FALSE)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#Modelo optmizado con advanced featuring 0.71===========
+# Modelo XGB optmizado con advanced featuring 0.71===========
 train_enriched_advanced <- train_enriched_final %>%
   mutate(
     # INTERACCIONES CLAVE
@@ -1912,235 +1571,712 @@ write.csv(submission_2, paste0(output_path, "XGB_threshold_036_depth_6_eta_01_ga
 
 
 # Modelo Optimizado y ensamblado ===============
-
-# NUEVO FEATURE ENGINEERING: ELIMINANDO INDICES Y CREANDO INTERACCIONES
-
-train_enriched_advanced_v2 <- train_enriched_final %>%
-  mutate(
-    # Eliminar 'score_empleabilidad' e 'indice_vulnerabilidad_mejorado' 
-    # y conservar sus componentes, si no existen ya.
-    
-    # INTERACCIONES CLAVE (Conservadas)
-    interaccion_educ_ocupacion = promedio_educacion * prop_ocupados,
-    densidad_por_educacion = Nper / (promedio_educacion + 0.1),
-    ratio_formalidad = num_empleados_formales / (num_empleados_informales + 1),
-    
-    # NUEVAS INTERACCIONES AVANZADAS:
-    educacion_por_hacinamiento = promedio_educacion / (prop_cuartos + 0.1), # prop_cuartos debe ser proporcional a número de cuartos/persona
-    prop_menores = num_minors / Nper, # Necesaria para la siguiente interacción
-    dependencia_informal = prop_menores * (1 - prop_cotizantes),
-    
-    # VARIABLES DE COMPOSICIÓN FAMILIAR MEJORADAS (Conservadas)
-    prop_adultos_mayores = ifelse(edad_maxima > 60, 1, 0),
-    diversidad_ocupacional = num_empleados_formales + num_independientes + num_trabajadores_domesticos,
-    
-    # INDICADORES DE ESTABILIDAD (Conservados)
-    estabilidad_laboral = num_empleados_estables / (num_occupied + 1),
-    variabilidad_ingresos = (num_ingreso_horas_extra + num_ingreso_bonificaciones) / Nper
-    
-    # NO INCLUYE: score_empleabilidad ni indice_vulnerabilidad_mejorado
-  ) %>%
-  # Asegúrate de eliminar las columnas antiguas de los índices si existieran en train_enriched_final
-  select(-matches("score_empleabilidad|indice_vulnerabilidad_mejorado")) 
+# Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
 
 
-# Aplicar a test
-test_enriched_advanced_v2 <- test_enriched_final %>%
-  mutate(
-    interaccion_educ_ocupacion = promedio_educacion * prop_ocupados,
-    densidad_por_educacion = Nper / (promedio_educacion + 0.1),
-    ratio_formalidad = num_empleados_formales / (num_empleados_informales + 1),
-    
-    educacion_por_hacinamiento = promedio_educacion / (prop_cuartos + 0.1),
-    prop_menores = num_minors / Nper,
-    dependencia_informal = prop_menores * (1 - prop_cotizantes),
-    
-    prop_adultos_mayores = ifelse(edad_maxima > 60, 1, 0),
-    diversidad_ocupacional = num_empleados_formales + num_independientes + num_trabajadores_domesticos,
-    
-    estabilidad_laboral = num_empleados_estables / (num_occupied + 1),
-    variabilidad_ingresos = (num_ingreso_horas_extra + num_ingreso_bonificaciones) / Nper
-  ) %>%
-  select(-matches("score_empleabilidad|indice_vulnerabilidad_mejorado")) 
-
-# 3. REPETIR EL PROCESO DE ENTRENAMIENTO Y PREDICCIÓN CON ESTA NUEVA DATA
-# (Usando la misma estrategia de Regularización y Validación Cruzada que funcionó)
-# A. FEATURE ENGINEERING AVANZADA (VERSION 2)
-# Eliminación de índices manuales y creación de nuevas interacciones
-
-# Nota: Asegúrate de que las variables como 'promedio_educacion', 'prop_ocupados', 
-# 'prop_cuartos', etc., existan en train_enriched_final y test_enriched_final.
-
-train_enriched_advanced_v2 <- train_enriched_final %>%
-  mutate(
-    # INTERACCIONES CLAVE (Conservadas)
-    interaccion_educ_ocupacion = promedio_educacion * prop_ocupados,
-    densidad_por_educacion = Nper / (promedio_educacion + 0.1),
-    ratio_formalidad = num_empleados_formales / (num_empleados_informales + 1),
-    
-    # NUEVAS INTERACCIONES AVANZADAS:
-    educacion_por_hacinamiento = promedio_educacion / (prop_cuartos + 0.1), 
-    prop_menores = num_minors / Nper, 
-    dependencia_informal = prop_menores * (1 - prop_cotizantes),
-    
-    # VARIABLES DE COMPOSICIÓN FAMILIAR MEJORADAS (Conservadas)
-    prop_adultos_mayores = ifelse(edad_maxima > 60, 1, 0),
-    diversidad_ocupacional = num_empleados_formales + num_independientes + num_trabajadores_domesticos,
-    
-    # INDICADORES DE ESTABILIDAD (Conservados)
-    estabilidad_laboral = num_empleados_estables / (num_occupied + 1),
-    variabilidad_ingresos = (num_ingreso_horas_extra + num_ingreso_bonificaciones) / Nper
-    
-  ) %>%
-  # ELIMINAR LOS ÍNDICES COMPUESTOS MANUALMENTE (Prioridad Media)
-  select(-matches("score_empleabilidad|indice_vulnerabilidad_mejorado"))
-
-# Aplicar a test
-test_enriched_advanced_v2 <- test_enriched_final %>%
-  mutate(
-    interaccion_educ_ocupacion = promedio_educacion * prop_ocupados,
-    densidad_por_educacion = Nper / (promedio_educacion + 0.1),
-    ratio_formalidad = num_empleados_formales / (num_empleados_informales + 1),
-    
-    educacion_por_hacinamiento = promedio_educacion / (prop_cuartos + 0.1),
-    prop_menores = num_minors / Nper,
-    dependencia_informal = prop_menores * (1 - prop_cotizantes),
-    
-    prop_adultos_mayores = ifelse(edad_maxima > 60, 1, 0),
-    diversidad_ocupacional = num_empleados_formales + num_independientes + num_trabajadores_domesticos,
-    
-    estabilidad_laboral = num_empleados_estables / (num_occupied + 1),
-    variabilidad_ingresos = (num_ingreso_horas_extra + num_ingreso_bonificaciones) / Nper
-  ) %>%
-  select(-matches("score_empleabilidad|indice_vulnerabilidad_mejorado"))
-
-
-# 1. DIVIDIR TRAIN_ENRICHED_ADVANCED_V2
-
-# Asegúrate de que 'Pobre' sea factor con los niveles correctos
-train_enriched_advanced_v2$Pobre <- factor(train_enriched_advanced_v2$Pobre, levels = c("NoPobre", "Pobre"))
-
-set.seed(42) 
-in_train_v2 <- createDataPartition(
-  y = train_enriched_advanced_v2$Pobre, 
-  p = 0.8, 
-  list = FALSE
-)
-
-# Particionar los datos
-train_data_v2 <- train_enriched_advanced_v2[in_train_v2, ]
-validation_data_v2 <- train_enriched_advanced_v2[-in_train_v2, ]
-
-cat("✨ Datos divididos: 80% Entrenamiento, 20% Validación.\n")
-
-
-# 2. ENTRENAR MODELO REGULARIZADO (model_regularized_v2)
-
-set.seed(2025)
-model_regularized_v2 <- train(
-  Pobre ~ .,
-  data = train_data_v2 %>% select(-id), 
-  method = "xgbTree",
-  trControl = trainControl(
-    method = "cv",
-    number = 5,
-    classProbs = TRUE,
-    summaryFunction = twoClassSummary,
-    verboseIter = FALSE
-  ),
-  tuneGrid = expand.grid(
-    # Parámetros regularizados (mejorados del intento anterior)
-    nrounds = 150, 
-    max_depth = 5, 
-    eta = 0.1,
-    gamma = 5, # Alta regularización
-    colsample_bytree = 0.7,
-    min_child_weight = 5, # Alta regularización
-    subsample = 0.8
-  ),
-  verbose = FALSE
-)
-
-cat("🎉 Entrenamiento del modelo V2 con nuevas features completado.\n")
-
-# 3. OPTIMIZAR EL THRESHOLD EN EL CONJUNTO DE VALIDACIÓN
-
-# Predecir probabilidades en el conjunto de VALIDACIÓN (datos nunca vistos)
-prob_val_v2 <- predict(model_regularized_v2, validation_data_v2, type = "prob")$Pobre
-
-thresholds <- seq(0.01, 0.5, 0.005) # Usar pasos finos para mayor precisión
-f1_scores_val_v2 <- numeric(length(thresholds))
-
-for(i in seq_along(thresholds)) {
-  pred <- factor(
-    ifelse(prob_val_v2 > thresholds[i], "Pobre", "NoPobre"), 
-    levels = c("NoPobre", "Pobre")
-  )
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(
+  readr, tidyverse, googledrive, skimr, naniar, dplyr, 
+  caret, 
+  ranger, 
+  pROC, e1071, themis, recipes, 
+  glmnet,      
+  xgboost,     
+  rpart,      
+  klaR,        
+  doParallel,   
   
-  tryCatch({
-    cm <- confusionMatrix(pred, validation_data_v2$Pobre, positive = "Pobre")
-    precision <- cm$byClass["Pos Pred Value"]
-    recall <- cm$byClass["Sensitivity"]
-    
-    if (is.na(precision) | is.na(recall) | (precision + recall) == 0) {
-      f1_scores_val_v2[i] <- 0
-    } else {
-      f1_scores_val_v2[i] <- 2 * (precision * recall) / (precision + recall)
-    }
-  }, error = function(e) {
-    f1_scores_val_v2[i] <- 0
-  })
+  # <<< FUSIÓN: Paquetes añadidos de v_Max_Performance >>>
+  data.table, tidyr, stringr, tibble, purrr,
+  Matrix, tictoc
+)
+
+# <<< MODIFICACIÓN: Añadida variable de control de v_Max_Performance >>>
+TARGET_POS   <- "Si"    # clase positiva (Pobre=1)
+
+googledrive::drive_auth(email = "elianmoreno58@gmail.com") 
+
+folder <- drive_get("ProblemSet2")
+files <- drive_ls(folder)
+train_hogares <- read_csv(drive_download(files[files$name == "train_hogares.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
+train_personas <- read_csv(drive_download(files[files$name == "train_personas.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
+test_hogares <- read_csv(drive_download(files[files$name == "test_hogares.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
+test_personas <- read_csv(drive_download(files[files$name == "test_personas.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
+cat("¡Datos cargados!\n\n")
+
+# --- <<< FUSIÓN: Funciones Auxiliares de v_Max_Performance >>> ---
+cat("Cargando funciones auxiliares (Winsorize, Drop Corr, Opt_Threshold)...\n")
+# Winsorización
+winsorize_vec <- function(x, p_low=.01, p_high=.99){
+  if(!is.numeric(x) || all(is.na(x))) return(x)
+  qs <- quantile(x, probs=c(p_low,p_high), na.rm=TRUE, names = FALSE)
+  if(anyNA(qs)) return(x)
+  pmin(pmax(x, qs[1]), qs[2])
 }
 
-best_threshold_val_v2 <- thresholds[which.max(f1_scores_val_v2)]
-best_f1_val_v2 <- max(f1_scores_val_v2)
+# Eliminar variables correlacionadas (Robusta)
+drop_high_corr <- function(df_num, thr=0.95){
+  cnum <- df_num %>% dplyr::select(where(is.numeric))
+  if(ncol(cnum) < 2) return(list(df=df_num, dropped=character(0)))
+  variances <- sapply(cnum, function(x) var(x, na.rm = TRUE)); zero_var_cols <- names(variances[variances < 1e-10 | is.na(variances)])
+  if (length(zero_var_cols) > 0) { cnum_valid_var <- cnum %>% dplyr::select(-any_of(zero_var_cols)); if(ncol(cnum_valid_var) < 2) return(list(df=dplyr::select(df_num, -any_of(zero_var_cols)), dropped=zero_var_cols))
+  } else { cnum_valid_var <- cnum }
+  corM <- suppressWarnings(cor(cnum_valid_var, use="pairwise.complete.obs")); corM[is.na(corM)] <- 0
+  upper <- corM; upper[lower.tri(upper, diag=TRUE)] <- 0
+  todrop_logical <- apply(upper, 2, function(col) any(abs(col) > thr, na.rm = TRUE))
+  todrop_corr <- colnames(upper)[todrop_logical]; todrop_corr <- todrop_corr[!is.na(todrop_corr)]
+  dropped_final <- unique(c(todrop_corr, zero_var_cols))
+  list(df = dplyr::select(df_num, -any_of(dropped_final)), dropped = dropped_final)
+}
 
-cat("\n========================================================\n")
-cat("🎯 RESULTADOS V2 CON NUEVAS FEATURES:\n")
-cat("- Mejor F1 en Validación:", round(best_f1_val_v2, 4), "\n")
-cat("- Mejor Threshold para Kaggle:", best_threshold_val_v2, "\n")
-cat("========================================================\n")
+# Optimizar umbral F1
+opt_threshold <- function(y_true, p, grid = seq(0.05,0.95,by=.01), positive = TARGET_POS){
+  best <- list(thr = 0.5, f1 = -1); lvls <- levels(y_true); neg_level <- setdiff(lvls, positive)[1]
+  if(length(lvls) != 2 || !positive %in% lvls) { warning("opt_threshold: y_true no es factor binario."); return(best) }
+  if(anyNA(p)) { warning("opt_threshold: NAs en probabilidades 'p'."); return(best)}
+  for(th in grid){
+    pred <- factor(ifelse(p >= th, positive, neg_level), levels = lvls)
+    cm_res <- try(caret::confusionMatrix(pred, y_true, positive = positive), silent = TRUE)
+    if(inherits(cm_res, "try-error")) next
+    cm <- cm_res; P <- cm$byClass["Pos Pred Value"]; R <- cm$byClass["Sensitivity"]
+    F1 <- ifelse(is.na(P) || is.na(R) || P+R==0, NA, 2*(P*R)/(P+R))
+    if(!is.na(F1) && F1 > best$f1) best <- list(thr = th, f1 = F1)
+  }
+  best
+}
 
-# 4. GENERAR LA SUBMISSION CON TEST_ENRICHED_ADVANCED_V2
+# Reporte de métricas
+metric_report <- function(y_true, p, thr, positive = TARGET_POS){
+  lvls <- levels(y_true); neg_level <- setdiff(lvls, positive)[1]
+  if(length(lvls) != 2 || !positive %in% lvls) { warning("metric_report: y_true no es factor binario."); return(tibble(F1=NA, Precision=NA, Recall=NA, Accuracy=NA)) }
+  if(anyNA(p)) { warning("metric_report: NAs en probabilidades 'p'."); return(tibble(F1=NA, Precision=NA, Recall=NA, Accuracy=NA))}
+  pred <- factor(ifelse(p >= thr, positive, neg_level), levels = lvls)
+  cm_res <- try(caret::confusionMatrix(pred, y_true, positive = positive), silent = TRUE)
+  if(inherits(cm_res, "try-error")) return(tibble(F1=NA, Precision=NA, Recall=NA, Accuracy=NA))
+  cm <- cm_res; P <- cm$byClass["Pos Pred Value"]; R <- cm$byClass["Sensitivity"]
+  F1_val <- ifelse(is.na(P) || is.na(R) || P+R == 0, NA, 2 * (P * R) / (P + R))
+  tibble( F1 = as.numeric(F1_val), Precision = as.numeric(P), Recall = as.numeric(R), Accuracy = as.numeric(cm$overall["Accuracy"]) )
+}
+cat("Funciones cargadas.\n\n")
+# --- FIN DE FUNCIONES AUXILIARES ---
 
-# 1. Predecir las probabilidades en el conjunto de prueba de Kaggle
-prob_test_v2 <- predict(model_regularized_v2, test_enriched_advanced_v2, type = "prob")$Pobre
 
-# 2. Aplicar el umbral óptimo encontrado en la validación
-predictions_kaggle_v2 <- factor(
-  ifelse(prob_test_v2 > best_threshold_val_v2, "Pobre", "NoPobre"), 
-  levels = c("NoPobre", "Pobre")
+# PASO 2: INGENIERÍA DE VARIABLES (Corregida v4)
+cat("Paso 2: Procesando y limpiando datos (Ingeniería de Variables Mejorada)...\n")
+process_personas_agg <- function(df_personas){
+  p <- df_personas %>%
+    mutate(
+      SexoMujer = as.integer(P6020 == 2), Edad = P6040, Menor18 = as.integer(Edad < 18),
+      Adulto_18a64 = as.integer(Edad >= 18 & Edad < 65), Mayor65 = as.integer(Edad >= 65),
+      Nivel_educ = ifelse(is.na(P6210) | P6210 == 9, 0L, P6210), Oc = dplyr::coalesce(Oc, 0L),
+      Ina = dplyr::coalesce(Ina, 0L), Des = dplyr::coalesce(Des, 0L),
+      Cot_pension = dplyr::case_when(P6920 %in% c(1,3) ~ 1L, P6920 == 2 ~ 0L, TRUE ~ 0L),
+      Afiliado_salud = as.integer(P6090 == 1), Jefe_hogar = as.integer(P6050 == 1)
+    )
+  agg <- p %>% group_by(id) %>%
+    summarise( Npers = n(), N_mujeres = sum(SexoMujer, na.rm=TRUE), N_menores18 = sum(Menor18, na.rm=TRUE),
+               N_adultos_18a64 = sum(Adulto_18a64, na.rm=TRUE), N_mayores65 = sum(Mayor65, na.rm=TRUE),
+               N_ocupados = sum(Oc, na.rm=TRUE), N_inactivos = sum(Ina, na.rm=TRUE),
+               N_desocupados = sum(Des, na.rm=TRUE), N_cotizantes = sum(Cot_pension, na.rm=TRUE),
+               N_afiliados_salud = sum(Afiliado_salud, na.rm=TRUE), Educ_max = max(Nivel_educ, na.rm=TRUE),
+               Edad_mean = mean(Edad, na.rm=TRUE), Edad_sd = sd(Edad, na.rm=TRUE),
+               .groups="drop" )
+  jefe <- p %>% filter(Jefe_hogar == 1) %>%
+    dplyr::select(id, Jefe_mujer = SexoMujer, Jefe_edad = Edad, Jefe_educ = Nivel_educ, Jefe_ocupado = Oc,
+                  Jefe_cotiza = Cot_pension, Jefe_afiliado = Afiliado_salud) %>% 
+    dplyr::distinct(id, .keep_all = TRUE)
+  agg <- agg %>% left_join(jefe, by="id") %>%
+    mutate( Prop_mujeres = N_mujeres / pmax(Npers,1), Prop_menores18 = N_menores18 / pmax(Npers,1),
+            Prop_mayores65 = N_mayores65 / pmax(Npers,1),
+            Razon_dependencia = ifelse(N_adultos_18a64 > 0, (N_menores18 + N_mayores65)/N_adultos_18a64, N_menores18 + N_mayores65),
+            PEA = N_ocupados + N_desocupados, Tasa_ocupacion = ifelse(N_adultos_18a64 > 0, N_ocupados/N_adultos_18a64, 0),
+            Tasa_desocupacion = ifelse(PEA > 0, N_desocupados/PEA, 0), Tasa_inactividad = ifelse(N_adultos_18a64 > 0, N_inactivos/N_adultos_18a64, 0),
+            Prop_cotizantes = ifelse(N_adultos_18a64 > 0, N_cotizantes/N_adultos_18a64, 0), Prop_afiliados = N_afiliados_salud / pmax(Npers,1) ) %>%
+    mutate(across(where(is.numeric), ~replace_na(., 0)))
+  return(agg)
+}
+agg_train <- process_personas_agg(train_personas); agg_test <- process_personas_agg(test_personas)
+mk_bin <- function(x) as.integer(!is.na(x) & x > 0 & x != 9)
+add_bins_scores <- function(df){
+  keep <- c("P5090","P5100","P5110","P5120","P5130","P5140","P5150","P5160","P5170","P5180","Estrato1","P6008","P6010")
+  for(k in keep) if(k %in% names(df)) df[[paste0("bin_",k)]] <- mk_bin(df[[k]])
+  serv_cols <- grep("^bin_P51", names(df), value = TRUE)
+  act_cols <- intersect(paste0("bin_", c("P6008","P6010","Estrato1")), names(df))
+  mat_cols <- intersect(paste0("bin_", c("P5090","P5100","P5110")), names(df))
+  if(length(serv_cols) > 0) df$score_servicios <- rowSums(df[, serv_cols, drop = FALSE], na.rm=TRUE) else df$score_servicios <- 0
+  if(length(act_cols) > 0) df$score_activos    <- rowSums(df[, act_cols, drop = FALSE], na.rm=TRUE) else df$score_activos <- 0
+  if(length(mat_cols) > 0) df$score_material   <- rowSums(df[, mat_cols, drop = FALSE], na.rm=TRUE) else df$score_material <- 0
+  df
+}
+trh <- train_hogares %>% mutate( Hacinamiento_dormir = ifelse(P5010 > 0, Nper/P5010, Nper), Prop_dormir_cuartos = ifelse(P5000 > 0, P5010/P5000, 0)) %>% add_bins_scores()
+teh <- test_hogares %>% mutate( Hacinamiento_dormir = ifelse(P5010 > 0, Nper/P5010, Nper), Prop_dormir_cuartos = ifelse(P5000 > 0, P5010/P5000, 0)) %>% add_bins_scores()
+train <- trh %>% left_join(agg_train, by="id"); 
+test <- teh %>% left_join(agg_test %>% dplyr::select(-any_of("Pobre")), by="id")
+train <- train %>% mutate(Pobre = factor(ifelse(Pobre==1,"Si","No"), levels=c("No","Si")))
+add_interactions <- function(df){
+  if(all(c("Educ_max", "Npers") %in% names(df))) df$inter_Educ_Npers <- df$Educ_max * df$Npers
+  if(all(c("Jefe_edad", "Razon_dependencia") %in% names(df))) df$inter_JefeEdad_Dep <- df$Jefe_edad * df$Razon_dependencia
+  if(all(c("Hacinamiento_dormir", "score_material") %in% names(df))) df$inter_Hacina_Material <- df$Hacinamiento_dormir * df$score_material
+  if(all(c("Prop_menores18", "score_servicios") %in% names(df))) df$inter_Menores_Serv <- df$Prop_menores18 * df$score_servicios
+  df
+}
+train <- add_interactions(train); test <- add_interactions(test)
+num_cols_all <- train %>% dplyr::select(where(is.numeric)) %>% names(); num_cols_all <- setdiff(num_cols_all, c("id"))
+train[num_cols_all] <- lapply(train[num_cols_all], winsorize_vec)
+common_test <- intersect(num_cols_all, names(test))
+if(length(common_test) > 0) test[common_test] <- lapply(test[common_test], winsorize_vec)
+
+# <<< CORRECCIÓN v7: Corregido "de}" por "df}" >>>
+make_ratios <- function(df){
+  add <- list( ratio_mujeres = c("N_mujeres","Npers"), ratio_menores = c("N_menores18","Npers"),
+               ratio_mayores = c("N_mayores65","Npers"), pea_percapita = c("PEA","Npers") )
+  for(nm in names(add)){ a <- add[[nm]][1]; b <- add[[nm]][2]; if(all(c(a,b) %in% names(df))) df[[nm]] <- df[[a]]/pmax(df[[b]],1) }
+  df
+}
+# <<< FIN CORRECCIÓN v7 >>>
+
+train <- make_ratios(train); test <- make_ratios(test)
+cat_cols <- intersect("Dominio", names(train)) %>% as.character()
+feature_cols <- setdiff(names(train), c("Pobre","id", "Ingtotug", "Ingpcug", "Ingtotugarr", "Indigente", "Npobres", "Nindigentes"))
+num_cols <- setdiff(feature_cols, cat_cols); num_cols <- intersect(num_cols, names(train %>% dplyr::select(where(is.numeric))))
+drop_res <- drop_high_corr(train[, intersect(num_cols, names(train)), drop=FALSE], thr = 0.95)
+kept_nums <- names(drop_res$df); dropped <- drop_res$dropped
+feature_cols_final <- c(kept_nums, cat_cols)
+X_all <- train[, feature_cols_final, drop=FALSE]
+y_all <- train$Pobre
+X_test <- test[, intersect(feature_cols_final, names(test)), drop=FALSE]
+missing_cols <- setdiff(names(X_all), names(X_test))
+if(length(missing_cols) > 0){ for(mcol in missing_cols){ if(is.factor(X_all[[mcol]])) X_test[[mcol]] <- as.character(NA) else X_test[[mcol]] <- NA } }
+X_test <- X_test[, names(X_all)]
+# --- FIN DE INGENIERÍA DE VARIABLES ---
+
+
+# <<< MODIFICACIÓN: PASO 3: DIVISIÓN Train/Holdout + RECIPE >>>
+cat("Paso 3: Creando división Train/Holdout (85/15) y Recipe...\n")
+set.seed(2025)
+TEST_SIZE <- 0.15 # 15% para holdout
+train_idx <- caret::createDataPartition(y_all, p = 1 - TEST_SIZE, list = FALSE)
+
+# --- Sets de datos para entrenamiento (85%) ---
+X_train_fold <- X_all[train_idx, ]
+y_train_fold <- y_all[train_idx]
+# --- Sets de datos para validación/holdout (15%) ---
+X_valid_fold <- X_all[-train_idx, ]
+y_valid_fold <- y_all[-train_idx]
+y_va_factor <- factor(y_valid_fold, levels = c("No", "Si")) # Factor para evaluación
+
+cat(sprintf("División creada: %d para entrenar, %d para validar umbral.\n", nrow(X_train_fold), nrow(X_valid_fold)))
+
+formula_rec <- as.formula(paste("Pobre ~", paste(names(X_all), collapse = " + ")))
+
+# <<< MODIFICACIÓN: Recipe se PREPARA solo con el fold de ENTRENAMIENTO (85%) >>>
+train_recipe <- recipes::recipe(formula_rec, data = cbind(Pobre = y_train_fold, X_train_fold)) %>%
+  step_impute_median(all_numeric_predictors()) %>%
+  step_impute_mode(all_nominal_predictors()) %>%
+  step_unknown(all_nominal_predictors(), new_level = "DESCONOCIDO") %>%
+  step_other(all_nominal_predictors(), threshold = 0.01, other = "OTROS_DOM") %>%
+  step_novel(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
+  step_zv(all_predictors()) %>%
+  themis::step_smote(Pobre, over_ratio = 0.5, neighbors = 5) # SMOTE solo se aplica aquí
+
+# Preparamos la recipe y creamos el set de entrenamiento balanceado
+rec_prep <- prep(train_recipe)
+train_balanced <- bake(rec_prep, new_data = NULL) # Datos del 85%, balanceados
+X_valid_baked <- bake(rec_prep, new_data = X_valid_fold) # Datos del 15%, procesados (sin SMOTE)
+X_test_baked <- bake(rec_prep, new_data = as.data.frame(X_test)) # Datos de test, procesados
+
+cat("¡Recipe preparado y datos balanceados/procesados!\n\n")
+# --- FIN DE RECIPE HÍBRIDA ---
+
+
+# PASO 4: ENTRENAMIENTO DE MODELOS (en datos 85% balanceados)
+cat("Paso 4: Entrenando 5 modelos (en 85% balanceado)...\n")
+set.seed(2025)
+
+# <<< MODIFICACIÓN: Se usa la función F1 robusta de v_Max_Performance >>>
+f1_summary <- function(data, lev = c("No","Si"), model = NULL){
+  F1 <- 0; Sens <- NA; Prec <- NA; Accuracy <- NA
+  obs_levels_ok <- all(lev %in% levels(data$obs)); pred_levels_ok <- all(lev %in% levels(data$pred))
+  if (!obs_levels_ok || !pred_levels_ok || length(intersect(levels(data$pred), levels(data$obs))) < 2) {
+    return(c(F1=F1, Sens=Sens, Prec=Prec, Accuracy=Accuracy))
+  }
+  data$obs <- factor(data$obs, levels = lev); data$pred <- factor(data$pred, levels = lev)
+  cm_res <- try(caret::confusionMatrix(data$pred, data$obs, positive = "Si"), silent=TRUE)
+  if(!inherits(cm_res, "try-error")){
+    cm <- cm_res; Accuracy <- cm$overall["Accuracy"]; P <- cm$byClass["Pos Pred Value"]; R <- cm$byClass["Sensitivity"]
+    if(!is.na(P) && !is.na(R) && (P + R > 0)) F1 <- 2 * (P * R) / (P + R)
+    Sens <- R; Prec <- P
+  }
+  c(F1=as.numeric(F1), Sens=as.numeric(Sens), Prec=as.numeric(Prec), Accuracy=as.numeric(Accuracy))
+}
+
+ctrl_tuning_opt <- trainControl(
+  method = "cv", number = 3, summaryFunction = f1_summary, classProbs = TRUE,
+  savePredictions = "final", 
+  verboseIter = TRUE, allowParallel = TRUE
 )
 
-# Crear el dataframe de submission
-submission_df_v2 <- data.frame(
-  id = test_enriched_advanced_v2$id,
-  Pobre = predictions_kaggle_v2
+cl <- makePSOCKcluster(detectCores() - 1); registerDoParallel(cl)
+cat(paste("Paralelización activada con", detectCores() - 1, "núcleos.\n"))
+
+model_list_opt <- list()
+# --- Modelo 1: Random Forest ---
+cat("\nEntrenando Random Forest (opt)...\n")
+try({
+  model_list_opt$RandomForest <- train( Pobre ~ ., data = train_balanced, method = "ranger", trControl = ctrl_tuning_opt, metric = "F1",
+                                        tuneGrid = expand.grid(mtry = c(floor(sqrt(ncol(train_balanced)-1)), floor((ncol(train_balanced)-1)/3)), splitrule = "gini", min.node.size = 15),
+                                        num.trees = 100, importance = 'none' )
+})
+# --- Modelo 2: Red Elástica ---
+cat("\nEntrenando Red Elástica (opt)...\n")
+try({
+  model_list_opt$ElasticNet <- train( Pobre ~ ., data = train_balanced, method = "glmnet", trControl = ctrl_tuning_opt, metric = "F1",
+                                      tuneGrid = expand.grid(alpha = c(0.5, 0.8, 1.0), lambda = 10^seq(-4, -2, length.out = 5)) )
+})
+# --- Modelo 3: Boosting (XGBoost)---
+cat("\nEntrenando XGBoost (optimizado)...\n")
+try({
+  model_list_opt$XGBoost <- train( Pobre ~ ., data = train_balanced, method = "xgbTree", trControl = ctrl_tuning_opt, metric = "F1",
+                                   tuneGrid = expand.grid(nrounds = 100, max_depth = c(3, 5), eta = 0.1, gamma = 0, colsample_bytree = 0.8, min_child_weight = 1, subsample = 0.8),
+                                   verbosity = 0
+  )
+})
+# --- Modelo 4: Naive Bayes ---
+cat("\nEntrenando Naive Bayes...\n")
+try({
+  model_list_opt$NaiveBayes <- train( Pobre ~ ., data = train_balanced, method = "naive_bayes", trControl = ctrl_tuning_opt, metric = "F1",
+                                      tuneGrid = expand.grid(laplace = 0, usekernel = TRUE, adjust = 1) )
+})
+# --- Modelo 5: Regresión Logística ---
+cat("\nEntrenando Regresión Logística...\n")
+try({
+  model_list_opt$Logit <- train( Pobre ~ ., data = train_balanced, method = "glm", family = "binomial", trControl = ctrl_tuning_opt, metric = "F1" )
+})
+# --- Detener paralelización ---
+stopCluster(cl); registerDoSEQ()
+cat("\n¡Entrenamiento optimizado completado!\n\n")
+successful_models_opt <- model_list_opt[!sapply(model_list_opt, is.null)]
+if (length(successful_models_opt) == 0) stop("¡ERROR FATAL: Ningún modelo pudo ser entrenado!")
+
+
+# <<< MODIFICACIÓN: NUEVO PASO 10 (Evaluación Holdout y Umbral) >>>
+cat("Paso 10: Evaluando modelos en Holdout (15%) y optimizando umbral F1...\n")
+
+# Lista para guardar las probabilidades del holdout (para el ensamble)
+holdout_probs_list <- list()
+
+results <- purrr::map_dfr(names(successful_models_opt), function(nm){
+  mod <- successful_models_opt[[nm]]
+  
+  p_res <- tryCatch({
+    predict(mod, newdata = X_valid_baked, type = "prob")[, TARGET_POS]
+  }, error = function(e) { rep(NA_real_, nrow(X_valid_baked)) })
+  
+  holdout_probs_list[[nm]] <<- p_res # Guardar probabilidades para el ensamble
+  
+  if(anyNA(p_res) || length(p_res) != length(y_va_factor)){ 
+    best <- list(thr=0.5, f1=NA)
+    met <- tibble(F1=NA,Precision=NA,Recall=NA,Accuracy=NA)
+  } else { 
+    best <- opt_threshold(y_va_factor, p_res)
+    met <- metric_report(y_va_factor, p_res, best$thr)
+  }
+  tibble(name = nm, thr = best$thr, F1 = met$F1, Precision = met$Precision, Recall = met$Recall, Accuracy = met$Accuracy)
+})
+
+perf <- results %>% arrange(desc(F1))
+cat("\n🏁 Resultados holdout (ordenado por F1):\n")
+print(perf %>% mutate(across(where(is.numeric), ~round(., 4))))
+
+if(all(is.na(perf$F1))) stop("Todos los modelos fallaron en la evaluación holdout.")
+
+best_idx <- which(!is.na(perf$F1))[1]
+best_name <- perf$name[best_idx]
+best_thr <- perf$thr[best_idx]
+best_model_object_opt <- successful_models_opt[[best_name]] # El mejor modelo, ya entrenado
+
+cat(sprintf("🥇 Mejor modelo: %s | Umbral Óptimo=%.3f | F1 en Holdout=%.4f\n", best_name, best_thr, perf$F1[best_idx]))
+
+
+# <<< MODIFICACIÓN: NUEVO PASO 11 (Predicción con Mejor Modelo y Umbral) >>>
+cat("Paso 11: Generando predicción final (Mejor Modelo Individual)...\n")
+
+# Predecir probabilidades en el set de TEST
+p_test_probs_best <- predict(best_model_object_opt, newdata = X_test_baked, type = "prob")[, TARGET_POS]
+
+# Aplicar el UMBRAL ÓPTIMO (no 0.5)
+pred_test_best <- as.integer(p_test_probs_best >= best_thr)
+
+resultados_finales_best <- data.frame( id = test$id, Pobre = pred_test_best )
+nombre_archivo_best <- paste0("predicciones_MEJOR_", gsub("[^A-Za-z0-9]", "_", best_name), "_thr", round(best_thr,2), ".csv")
+write.csv(resultados_finales_best, nombre_archivo_best, row.names = FALSE)
+
+cat(paste("\n✅ ¡LISTO (Mejor Modelo)! Archivo guardado:", nombre_archivo_best, "\n"))
+cat(paste("📊 Total predichos como pobres:", sum(resultados_finales_best$Pobre), "\n\n"))
+
+
+# <<< MODIFICACIÓN: NUEVO PASO 12 (Ensamble Top-K) >>>
+cat("Paso 12: Generando predicción (Ensamble Top-3)...\n")
+topk <- head(perf %>% filter(!is.na(F1)), min(3, sum(!is.na(perf$F1))))
+
+if(nrow(topk) > 0) {
+  weights <- topk$F1 / sum(topk$F1) # Ponderar por F1
+  
+  # --- 1. Calcular probabilidades del ensamble en HOLDOUT (para umbral) ---
+  ens_probs_va <- rep(0, nrow(X_valid_baked))
+  for(i in seq_len(nrow(topk))){
+    current_name <- topk$name[i]
+    pr_va <- holdout_probs_list[[current_name]] # Reusar probabilidades
+    if(!anyNA(pr_va)){
+      ens_probs_va <- ens_probs_va + as.numeric(weights[i]) * pr_va
+    }
+  }
+  
+  # --- 2. Optimizar umbral para el ENSAMBLE ---
+  ens_best_thr_info <- opt_threshold(y_va_factor, ens_probs_va)
+  ens_thr <- ens_best_thr_info$thr
+  ens_f1_holdout <- ens_best_thr_info$f1
+  cat(sprintf("  Umbral óptimo para ensamble (holdout): %.3f (F1 estimado: %.4f)\n", ens_thr, ens_f1_holdout))
+  
+  # --- 3. Calcular probabilidades del ensamble en TEST ---
+  ens_probs_test <- rep(0, nrow(X_test_baked))
+  cat("  Calculando probabilidades del ensamble en test...\n")
+  pb_test <- txtProgressBar(min = 0, max = nrow(topk), style = 3)
+  
+  for(i in seq_len(nrow(topk))){
+    current_name <- topk$name[i]
+    setTxtProgressBar(pb_test, i)
+    
+    # Reusar predicción del mejor modelo; calcular las otras
+    pr_test_res <- tryCatch({
+      if(current_name == best_name){ 
+        p_test_probs_best # Reusar del Paso 11
+      } else {
+        model_to_predict_ref <- successful_models_opt[[current_name]]
+        predict(model_to_predict_ref, newdata = X_test_baked, type = "prob")[, TARGET_POS]
+      }
+    }, error = function(e) { rep(NA_real_, nrow(X_test_baked)) })
+    
+    if(!anyNA(pr_test_res)){
+      ens_probs_test <- ens_probs_test + as.numeric(weights[i]) * pr_test_res
+    }
+  }
+  close(pb_test)
+  
+  # --- 4. Aplicar umbral del ensamble y guardar ---
+  ens_pred <- as.integer(ens_probs_test >= ens_thr)
+  submission_ens <- tibble(id = test$id, Pobre = ens_pred)
+  out_ens <- sprintf("predicciones_ENSAMBLE_Top%d_thr%.2f.csv", nrow(topk), ens_thr)
+  readr::write_csv(submission_ens, out_ens)
+  cat(sprintf("\n✅ ¡LISTO (Ensamble)! Archivo guardado: %s | Pobres=%d/%d\n", out_ens, sum(submission_ens$Pobre), nrow(submission_ens)))
+  
+} else {
+  cat("\n⚠️ No se pudo generar ensamble (no hay modelos válidos en topk).\n")
+}
+
+# --- FIN DEL SCRIPT ---
+cat("\n--- Script Finalizado ---\n")
+
+
+
+
+
+
+
+
+
+
+
+# 4. Sección de análisis de datos para modelo final =============
+
+p_load(broom, ggplot2)
+
+# Estadísticas descriptivas por grupo de pobreza
+estadisticas <- train %>%
+  group_by(Pobre) %>%
+  summarise(
+    Nper_mean = mean(Nper, na.rm = TRUE),
+    prop_ocupados_mean = mean(prop_ocupados, na.rm = TRUE),
+    prop_inactivos_mean = mean(prop_inactivos, na.rm = TRUE),
+    prop_cotizantes_mean = mean(prop_cotizantes, na.rm = TRUE),
+    cat_maxEduc_mean = mean(cat_maxEduc, na.rm = TRUE),
+    prop_cuartos_mean = mean(prop_cuartos, na.rm = TRUE)
+  )
+
+# Promedios totales
+totales <- train %>%
+  summarise(
+    Nper_total = mean(Nper, na.rm = TRUE),
+    prop_ocupados_total = mean(prop_ocupados, na.rm = TRUE),
+    prop_inactivos_total = mean(prop_inactivos, na.rm = TRUE),
+    prop_cotizantes_total = mean(prop_cotizantes, na.rm = TRUE),
+    cat_maxEduc_total = mean(cat_maxEduc, na.rm = TRUE),
+    prop_cuartos_total = mean(prop_cuartos, na.rm = TRUE)
+  )
+
+# 3. Pruebas de significancia (t-test)
+variables_test <- c("Nper", "prop_ocupados", "prop_inactivos", 
+                    "prop_cotizantes", "cat_maxEduc", "prop_cuartos")
+
+pruebas_significancia <- list()
+for(var in variables_test) {
+  formula <- as.formula(paste(var, "~ Pobre"))
+  prueba <- t.test(formula, data = train)
+  pruebas_significancia[[var]] <- tidy(prueba)
+}
+
+# 4. Resultados para exportar
+estadisticas
+totales
+pruebas_significancia
+
+# Variable objetivo:
+# Calcular frecuencias y porcentajes
+frecuencias <- table(train$Pobre)
+porcentajes <- prop.table(frecuencias) * 100
+
+# Crear etiquetas para las barras
+# Modificar solo esta línea:
+etiquetas <- paste0(format(frecuencias, big.mark = ".", decimal.mark = ","), 
+                    "\n(", round(porcentajes, 1), "%)")
+# Gráfico con frecuencias y porcentajes
+barplot(frecuencias,
+        main = "Distribución de la Variable Objetivo: Pobreza",
+        xlab = "Condición de Pobreza", 
+        ylab = "Número de Hogares",
+        col = c("gray70", "gray40"),
+        names.arg = c("No Pobre (0)", "Pobre (1) "),
+        ylim = c(0, max(frecuencias) * 1.1),
+        border = "black")
+
+# Agregar etiquetas encima de las barras
+text(x = c(0.7, 1.9), 
+     y = frecuencias + max(frecuencias) * 0.05,
+     labels = etiquetas,
+     cex = 0.8)
+
+
+
+
+
+
+
+
+
+
+
+
+# CÓDIGO PARA ESTADÍSTICAS COMPLETAS (ANEXO)
+library(tidyverse)
+
+# Lista de las 20 variables principales que ya tenemos
+variables_principales <- c("max_tiempo_empresa", "total_horas_trabajo", "edad_minima", 
+                           "promedio_tiempo_empresa", "edad_promedio", "rango_edad",
+                           "horas_promedio_trabajo", "edad_jefe_hogar", "edad_maxima",
+                           "num_salud_especial", "Nper", "num_salud_contributivo",
+                           "num_educacion_basica", "num_sin_salud", "promedio_educacion",
+                           "Nivel_educ", "educacion_jefe", "num_servicios", "num_women", 
+                           "num_cotizantes")
+
+# Obtener todas las variables del dataset
+todas_variables <- names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric)))
+
+# Filtrar las variables que NO están en las principales
+variables_anexo <- setdiff(todas_variables, variables_principales)
+
+cat("=== VARIABLES PARA EL ANEXO (", length(variables_anexo), " variables) ===\n")
+
+# Calcular estadísticas para las variables del anexo
+anexo_completo <- map_dfr(variables_anexo, function(var) {
+  formula <- as.formula(paste(var, "~ Pobre"))
+  test <- t.test(formula, data = train_enriched_final)
+  
+  data.frame(
+    variable = var,
+    media_total = round(mean(train_enriched_final[[var]], na.rm = TRUE), 3),
+    media_nopobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE), 3),
+    media_pobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE), 3),
+    diferencia = round(diff(test$estimate), 3),
+    p_valor = test$p.value,
+    significancia = ifelse(test$p.value < 0.01, "***", 
+                           ifelse(test$p.value < 0.05, "**", 
+                                  ifelse(test$p.value < 0.1, "*", "")))
+  )
+})
+
+# Organizar por categorías para el anexo
+categorias_anexo <- list(
+  "Vivienda" = c("tiene_vivienda", "cuartos_dormir", "prop_cuartos_dormir"),
+  "Composición Familiar" = c("bin_headWoman", "bin_occupiedHead"),
+  "Educación Detallada" = c("max_educacion", "num_sin_educacion", "num_educacion_media", 
+                            "num_educacion_superior"),
+  "Empleo Detallado" = c("num_occupied", "num_inactivos", "prop_inactivos", 
+                         "num_trabajadores_tiempo_completo", "num_trabajadores_medio_tiempo",
+                         "num_empleados_informales", "num_independientes", "num_patrones",
+                         "num_trabajadores_domesticos"),
+  "Seguridad Social Detallada" = c("num_salud_subsidiado", "num_sin_salud"),
+  "Búsqueda de Empleo" = c("num_buscando_trabajo", "num_disponibles_trabajar", 
+                           "num_quieren_mas_horas"),
+  "Subsidios" = c("num_recibe_subsidio_transporte", "num_recibe_subsidio_familiar",
+                  "num_recibe_subsidio_educativo"),
+  "Ingresos Adicionales" = c("num_ingreso_horas_extra", "num_ingreso_bonificaciones",
+                             "num_ingreso_primas"),
+  "Estabilidad Laboral" = c("num_empleados_estables", "num_empresas_grandes", 
+                            "num_empresas_pequenas"),
+  "Sector Económico" = c("num_agricultura", "num_industria"),
+  "Índices" = c("vulnerability_index")
 )
 
-# Convertir las etiquetas a enteros (0/1)
-final_submission_v2 <- submission_df_v2 %>% 
-  mutate(Pobre_numeric = ifelse(Pobre == "Pobre", 1, 0)) %>%
-  select(id, Pobre = Pobre_numeric)
+# Imprimir resultados organizados por categorías
+for(categoria in names(categorias_anexo)) {
+  vars_categoria <- categorias_anexo[[categoria]]
+  
+  tabla_categoria <- anexo_completo %>%
+    filter(variable %in% vars_categoria) %>%
+    select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia)
+  
+  cat("\n", paste0("=== ", categoria, " ==="), "\n")
+  print(tabla_categoria)
+  cat("Número de variables:", nrow(tabla_categoria), "\n")
+}
 
-# Definir el nombre del archivo
-n_rounds <- 150
-max_d <- 5
-gamma_val <- 5
-min_c_w <- 5
-threshold <- round(best_threshold_val_v2, 3) 
-file_name_v2 <- paste0(
-  "XGB_V2_r", n_rounds, 
-  "_d", max_d, 
-  "_g", gamma_val, 
-  "_w", min_c_w, 
-  "_T", sub("0\\.", "", as.character(threshold)), 
-  ".csv"
-)
+# También mostrar todas las variables del anexo en una sola tabla
+cat("\n=== TODAS LAS VARIABLES DEL ANEXO ===\n")
+print(anexo_completo %>% arrange(desc(abs(diferencia))))
 
-# Guardar el archivo (ajústalo a tu ruta si lo necesitas)
-write.csv(final_submission_v2, file = file_name_v2, row.names = FALSE)
+# Verificar que no nos faltó ninguna variable
+variables_procesadas <- c(variables_principales, anexo_completo$variable)
+variables_faltantes <- setdiff(todas_variables, variables_procesadas)
 
-cat("\n✅ ARCHIVO DE SUBMISSION V2 CREADO EXITOSAMENTE\n")
-cat("- Nombre del archivo:", file_name_v2, "\n")
-cat("========================================================\n")
+cat("\n=== VERIFICACIÓN ===\n")
+cat("Variables procesadas:", length(variables_procesadas), "\n")
+cat("Variables en dataset:", length(todas_variables), "\n")
+cat("Variables faltantes:", length(variables_faltantes), "\n")
+if(length(variables_faltantes) > 0) {
+  cat("Variables que faltan:", paste(variables_faltantes, collapse = ", "), "\n")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# CÓDIGO CORREGIDO PARA DESCRIPTIVAS
+library(tidyverse)
+
+# Calcular estadísticas básicas directamente
+descriptivas_simples <- train_enriched_final %>%
+  select(-id) %>%
+  group_by(Pobre) %>%
+  summarise(across(where(is.numeric), 
+                   list(media = ~mean(., na.rm = TRUE)), 
+                   .names = "{.col}")) %>%
+  pivot_longer(cols = -Pobre, names_to = "variable", values_to = "media") %>%
+  pivot_wider(names_from = Pobre, values_from = media, names_prefix = "media_")
+
+# Calcular diferencias con prueba t
+diferencias <- map_dfr(names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric))), 
+                       function(var) {
+                         formula <- as.formula(paste(var, "~ Pobre"))
+                         test <- t.test(formula, data = train_enriched_final)
+                         
+                         data.frame(
+                           variable = var,
+                           media_total = mean(train_enriched_final[[var]], na.rm = TRUE),
+                           media_nopobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE),
+                           media_pobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE),
+                           diferencia = diff(test$estimate),
+                           p_valor = test$p.value,
+                           significancia = ifelse(test$p.value < 0.01, "***", 
+                                                  ifelse(test$p.value < 0.05, "**", 
+                                                         ifelse(test$p.value < 0.1, "*", "")))
+                         )
+                       })
+
+# Mostrar resultados en consola
+cat("=== VARIABLES MÁS RELEVANTES ===\n")
+print(diferencias %>% 
+        arrange(desc(abs(diferencia))) %>%
+        select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia) %>%
+        head(20))
+
+# Mostrar por categorías específicas
+cat("\n=== VARIABLES DEMOGRÁFICAS ===\n")
+demograficas <- c("Nper", "num_women", "num_minors", "edad_promedio", "edad_jefe_hogar")
+print(diferencias %>% filter(variable %in% demograficas))
+
+cat("\n=== VARIABLES EDUCACIÓN ===\n")
+educacion <- c("cat_maxEduc", "promedio_educacion", "max_educacion", "educacion_jefe")
+print(diferencias %>% filter(variable %in% educacion))
+
+cat("\n=== VARIABLES EMPLEO ===\n")
+empleo <- c("prop_ocupados", "prop_inactivos", "num_empleados_formales", "num_empleados_informales")
+print(diferencias %>% filter(variable %in% empleo))
+
+cat("\n=== VARIABLES SEGURIDAD SOCIAL ===\n")
+ss <- c("prop_cotizantes", "num_salud_contributivo", "num_salud_subsidiado")
+print(diferencias %>% filter(variable %in% ss))
+
+cat("\n=== VARIABLES VIVIENDA ===\n")
+vivienda <- c("prop_cuartos", "n_cuartos", "bin_rent")
+print(diferencias %>% filter(variable %in% vivienda))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
