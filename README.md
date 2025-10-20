@@ -16,7 +16,7 @@ Una guía rápida para navegar el repositorio:
 Este proyecto es el resultado del trabajo colaborativo. Las contribuciones sustanciales de cada miembro incluyen:
 
 
-### [Marlon Angulo Ramos]
+### Marlon Angulo Ramos
 1. Construcción e integración de las bases de hogares y personas desde la GEIH.
 2. Implementación de la ingeniería de variables enriquecida (más de 50 nuevas variables).
 3. Desarrollo del índice de vulnerabilidad y de los indicadores agregados por hogar.
