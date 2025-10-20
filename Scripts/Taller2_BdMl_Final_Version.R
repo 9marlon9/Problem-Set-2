@@ -1827,7 +1827,7 @@ print(diferencias %>% filter(variable %in% vivienda))
 
 
 
-# 3.2.11 Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
+# 5. Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
 
 
 if (!require("pacman")) install.packages("pacman")
