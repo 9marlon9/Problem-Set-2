@@ -300,6 +300,7 @@ train <- train |>
                         levels = c(0, 1),
                         labels = c("NoPobre", "Pobre")))
 
+
 # 3. Modelo RF sin balanceo de muestras =================
 
 
@@ -373,14 +374,12 @@ submission <- data.frame(
   id = test$id,
   poverty = as.numeric(predicciones_test) - 1  
 )
-ruta_descargas <- "C:/Users/Marlon Angulo/Downloads"
-best_mtry <- model_rf_fast$bestTune$mtry
-nombre_archivo <- paste0("RF_mtry_", best_mtry, "_ntree_100_sampling_down.csv")
-ruta_completa <- file.path(ruta_descargas, nombre_archivo)
+#ruta_descargas <- "C:/Users/Marlon Angulo/Downloads"
+#best_mtry <- model_rf_fast$bestTune$mtry
+#nombre_archivo <- paste0("RF_mtry_", best_mtry, "_ntree_100_sampling_down.csv")
+#ruta_completa <- file.path(ruta_descargas, nombre_archivo)
 # Guardar el submission
-write.csv(submission, ruta_completa, row.names = FALSE)
-
-
+#write.csv(submission, ruta_completa, row.names = FALSE)
 
 predicciones_model_rf_fast_down <- predict(model_rf_fast, newdata = train)
 confusion_matrix <- confusionMatrix(predicciones_model_rf_fast_down, train$Pobre)
@@ -439,12 +438,12 @@ submission <- data.frame(
   id = test$id,
   poverty = as.numeric(predicciones_test) - 1  
 )
-ruta_descargas <- "C:/Users/Marlon Angulo/Downloads"
-best_mtry <- model_rf_fast$bestTune$mtry
-nombre_archivo <- paste0("RF_mtry_", best_mtry, "_ntree_100_sampling_down.csv")
-ruta_completa <- file.path(ruta_descargas, nombre_archivo)
+#ruta_descargas <- "C:/Users/Marlon Angulo/Downloads"
+#best_mtry <- model_rf_fast$bestTune$mtry
+#nombre_archivo <- paste0("RF_mtry_", best_mtry, "_ntree_100_sampling_down.csv")
+#ruta_completa <- file.path(ruta_descargas, nombre_archivo)
 # Guardar el submission
-write.csv(submission, ruta_completa, row.names = FALSE)
+#write.csv(submission, ruta_completa, row.names = FALSE)
 
 
 
@@ -1130,7 +1129,7 @@ write.csv(submission_final, "C:/Users/Marlon Angulo/Downloads/XGB_enhanced_ensem
 
 
 
-# 3.2.9 Modelo Final XGB Optimizado 0.70 (Mejor modelo) ========
+# 3.2.9 (Mejor modelo) Modelo Final XGB Optimizado 0.70  ========
 # ENRIQUECIMIENTO MASIVO DE VARIABLES DESDE DATOS ORIGINALES
 
 cat("🚀 AGREGANDO 50+ VARIABLES NUEVAS DESDE DATOS ORIGINALES\n")
@@ -1576,18 +1575,11 @@ pacman::p_load(
   Matrix, tictoc
 )
 
-# <<< MODIFICACIÓN: Añadida variable de control de v_Max_Performance >>>
-TARGET_POS   <- "Si"    # clase positiva (Pobre=1)
-
-googledrive::drive_auth(email = "elianmoreno58@gmail.com") 
-
-folder <- drive_get("ProblemSet2")
-files <- drive_ls(folder)
-train_hogares <- read_csv(drive_download(files[files$name == "train_hogares.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
-train_personas <- read_csv(drive_download(files[files$name == "train_personas.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
-test_hogares <- read_csv(drive_download(files[files$name == "test_hogares.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
-test_personas <- read_csv(drive_download(files[files$name == "test_personas.csv",]$id, path = tempfile(fileext = ".csv"), overwrite = TRUE)$local_path, show_col_types = FALSE)
-cat("¡Datos cargados!\n\n")
+##Importación de datos desde dropbox##
+train_hogares <- read_csv("https://www.dropbox.com/scl/fi/y4gn7m3xc196b4t3muf50/train_hogares.csv?rlkey=pclg0plogyqvvio8qgzq8w478&st=ints36kh&dl=1")  
+train_personas <- read_csv("https://www.dropbox.com/scl/fi/ztw34qzjaatqka2mqmop9/train_personas.csv?rlkey=cm1jj1wi2j5z8n2i21gwjnyec&st=saabj5rr&dl=1")  
+test_personas <- read_csv("https://www.dropbox.com/scl/fi/llb9izc4i7ef11z5di92i/test_personas.csv?rlkey=vfaol826sceevmgg9ra6zvwe7&st=oxwg3o4x&dl=1")  
+test_hogares <- read_csv("https://www.dropbox.com/scl/fi/rgox9tm1geg7js959rzza/test_hogares.csv?rlkey=5esm82u2z1lz7iidkhxcqgfvy&st=wrx2n2id&dl=1") 
 
 # --- <<< FUSIÓN: Funciones Auxiliares de v_Max_Performance >>> ---
 cat("Cargando funciones auxiliares (Winsorize, Drop Corr, Opt_Threshold)...\n")
