@@ -3,8 +3,7 @@
 # 0.Cargar datos  =========
 install.packages("pacman")
 library(pacman)
-p_load(readr,tidyverse,googledrive, skimr, naniar, dplyr, caret, themis, recipes, janitor)
-
+p_load(readr,tidyverse, skimr, naniar, dplyr, caret, themis, recipes, janitor)
 
 ##Importación de datos desde dropbox##
 train_hogares <- read_csv("https://www.dropbox.com/scl/fi/y4gn7m3xc196b4t3muf50/train_hogares.csv?rlkey=pclg0plogyqvvio8qgzq8w478&st=ints36kh&dl=1")  
@@ -508,7 +507,7 @@ write.csv(submission_up, ruta_completa, row.names = FALSE)
 
 
 
-# 3.3.4 Modelo RF con Down-Sampling N_tree 150 ===============
+# 3.2.4 Modelo RF con Down-Sampling N_tree 150 ===============
 
 # Función F1 personalizada que penaliza más los Falsos Negativos
 f1_weighted <- function(data, lev = NULL, model = NULL) {
@@ -591,7 +590,7 @@ print(confusion_matrix)
 
 
 
-# 3.3.5 Modelo con Boosting ==============
+# 3.2.5 Modelo con Boosting ==============
 p_load(xgboost)
 
 # Calcular peso para clase minoritaria
@@ -620,7 +619,7 @@ predicciones_model_xgb <- predict(model_xgb, newdata = train)
 confusion_matrix <- confusionMatrix(predicciones_model_xgb, train$Pobre)
 print(confusion_matrix)
 
-# 3.3.6 Modelo Boosting Trashehold 0.3 ===========
+# 3.2.6 Modelo Boosting Trashehold 0.3 ===========
 
 
 train$Pobre <- factor(ifelse(train$Pobre == 1, "Pobre", "NoPobre"),
@@ -833,7 +832,7 @@ write.csv(submission_xgb, ruta_completa, row.names = FALSE)
 
 
 
-# 3.3.7 Modelo solo con top 8 variables ===========
+# 3.2.7 Modelo solo con top 8 variables ===========
 vars_top <- c("Pobre", "prop_cotizantes", "prop_cuartos", "prop_ocupados", 
               "num_cotizantes", "tiene_vivienda", "cat_maxEduc", 
               "prop_cuartos_dormir", "Nivel_educ")
@@ -885,7 +884,7 @@ write.csv(submission_top, "C:/Users/Marlon Angulo/Downloads/XGB_top_variables_th
 
 
 
-# 3.3.8 Modelo con variables avanzadas ==========
+# 3.2.8 Modelo con variables avanzadas ==========
 
 
 # Crear nuevas variables basadas en las relaciones más importantes
@@ -1124,7 +1123,7 @@ write.csv(submission_final, "C:/Users/Marlon Angulo/Downloads/XGB_enhanced_ensem
 
 
 
-# 3.3.9 Modelo Final XGB Optimizado 0.70 (Mejor modelo) ========
+# 3.2.9 Modelo Final XGB Optimizado 0.70 (Mejor modelo) ========
 # ENRIQUECIMIENTO MASIVO DE VARIABLES DESDE DATOS ORIGINALES
 
 cat("🚀 AGREGANDO 50+ VARIABLES NUEVAS DESDE DATOS ORIGINALES\n")
@@ -1427,7 +1426,7 @@ submission_1 <- data.frame(
 
 write.csv(submission_1, paste0(output_path, "XGB_threshold_034_depth_6_eta_01_gamma_1.csv"), row.names = FALSE)
 
-# 3.3.10 Modelo XGB optmizado con advanced featuring 0.71===========
+# 3.2.10 Modelo XGB optmizado con advanced featuring 0.71===========
 train_enriched_advanced <- train_enriched_final %>%
   mutate(
     # INTERACCIONES CLAVE
@@ -1550,7 +1549,7 @@ write.csv(submission_2, paste0(output_path, "XGB_threshold_036_depth_6_eta_01_ga
 
 
 
-# 3.3.11 Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
+# 3.2.11 Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
 
 
 if (!require("pacman")) install.packages("pacman")
@@ -2136,26 +2135,6 @@ cat("Variables faltantes:", length(variables_faltantes), "\n")
 if(length(variables_faltantes) > 0) {
   cat("Variables que faltan:", paste(variables_faltantes, collapse = ", "), "\n")
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # CÓDIGO CORREGIDO PARA DESCRIPTIVAS
