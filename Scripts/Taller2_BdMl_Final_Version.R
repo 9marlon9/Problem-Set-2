@@ -1132,7 +1132,7 @@ write.csv(submission_final, "C:/Users/Marlon Angulo/Downloads/XGB_enhanced_ensem
 # 3.2.9 (Mejor modelo) Modelo Final XGB Optimizado 0.70  ========
 # ENRIQUECIMIENTO MASIVO DE VARIABLES DESDE DATOS ORIGINALES
 
-cat("🚀 AGREGANDO 50+ VARIABLES NUEVAS DESDE DATOS ORIGINALES\n")
+#AGREGANDO 50+ VARIABLES NUEVAS DESDE DATOS ORIGINALES
 
 # 1. AGREGAR MÁS VARIABLES DE PERSONAS A NIVEL HOGAR
 train_personas_enriched <- train_personas |> 
@@ -1555,6 +1555,278 @@ write.csv(submission_2, paste0(output_path, "XGB_threshold_036_depth_6_eta_01_ga
 
 
 
+# 4. Sección de análisis de datos para modelo final =============
+
+p_load(broom, ggplot2)
+
+# Estadísticas descriptivas por grupo de pobreza
+estadisticas <- train %>%
+  group_by(Pobre) %>%
+  summarise(
+    Nper_mean = mean(Nper, na.rm = TRUE),
+    prop_ocupados_mean = mean(prop_ocupados, na.rm = TRUE),
+    prop_inactivos_mean = mean(prop_inactivos, na.rm = TRUE),
+    prop_cotizantes_mean = mean(prop_cotizantes, na.rm = TRUE),
+    cat_maxEduc_mean = mean(cat_maxEduc, na.rm = TRUE),
+    prop_cuartos_mean = mean(prop_cuartos, na.rm = TRUE)
+  )
+
+# Promedios totales
+totales <- train %>%
+  summarise(
+    Nper_total = mean(Nper, na.rm = TRUE),
+    prop_ocupados_total = mean(prop_ocupados, na.rm = TRUE),
+    prop_inactivos_total = mean(prop_inactivos, na.rm = TRUE),
+    prop_cotizantes_total = mean(prop_cotizantes, na.rm = TRUE),
+    cat_maxEduc_total = mean(cat_maxEduc, na.rm = TRUE),
+    prop_cuartos_total = mean(prop_cuartos, na.rm = TRUE)
+  )
+
+# 3. Pruebas de significancia (t-test)
+variables_test <- c("Nper", "prop_ocupados", "prop_inactivos", 
+                    "prop_cotizantes", "cat_maxEduc", "prop_cuartos")
+
+pruebas_significancia <- list()
+for(var in variables_test) {
+  formula <- as.formula(paste(var, "~ Pobre"))
+  prueba <- t.test(formula, data = train)
+  pruebas_significancia[[var]] <- tidy(prueba)
+}
+
+# 4. Resultados para exportar
+estadisticas
+totales
+pruebas_significancia
+
+# Variable objetivo:
+# Calcular frecuencias y porcentajes
+frecuencias <- table(train$Pobre)
+porcentajes <- prop.table(frecuencias) * 100
+
+# Crear etiquetas para las barras
+# Modificar solo esta línea:
+etiquetas <- paste0(format(frecuencias, big.mark = ".", decimal.mark = ","), 
+                    "\n(", round(porcentajes, 1), "%)")
+# Gráfico con frecuencias y porcentajes
+barplot(frecuencias,
+        main = "Distribución de la Variable Objetivo: Pobreza",
+        xlab = "Condición de Pobreza", 
+        ylab = "Número de Hogares",
+        col = c("gray70", "gray40"),
+        names.arg = c("No Pobre (0)", "Pobre (1) "),
+        ylim = c(0, max(frecuencias) * 1.1),
+        border = "black")
+
+# Agregar etiquetas encima de las barras
+text(x = c(0.7, 1.9), 
+     y = frecuencias + max(frecuencias) * 0.05,
+     labels = etiquetas,
+     cex = 0.8)
+
+
+
+
+
+
+
+
+
+
+
+
+# CÓDIGO PARA ESTADÍSTICAS COMPLETAS (ANEXO)
+library(tidyverse)
+
+# Lista de las 20 variables principales que ya tenemos
+variables_principales <- c("max_tiempo_empresa", "total_horas_trabajo", "edad_minima", 
+                           "promedio_tiempo_empresa", "edad_promedio", "rango_edad",
+                           "horas_promedio_trabajo", "edad_jefe_hogar", "edad_maxima",
+                           "num_salud_especial", "Nper", "num_salud_contributivo",
+                           "num_educacion_basica", "num_sin_salud", "promedio_educacion",
+                           "Nivel_educ", "educacion_jefe", "num_servicios", "num_women", 
+                           "num_cotizantes")
+
+# Obtener todas las variables del dataset
+todas_variables <- names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric)))
+
+# Filtrar las variables que NO están en las principales
+variables_anexo <- setdiff(todas_variables, variables_principales)
+
+cat("=== VARIABLES PARA EL ANEXO (", length(variables_anexo), " variables) ===\n")
+
+# Calcular estadísticas para las variables del anexo
+anexo_completo <- map_dfr(variables_anexo, function(var) {
+  formula <- as.formula(paste(var, "~ Pobre"))
+  test <- t.test(formula, data = train_enriched_final)
+  
+  data.frame(
+    variable = var,
+    media_total = round(mean(train_enriched_final[[var]], na.rm = TRUE), 3),
+    media_nopobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE), 3),
+    media_pobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE), 3),
+    diferencia = round(diff(test$estimate), 3),
+    p_valor = test$p.value,
+    significancia = ifelse(test$p.value < 0.01, "***", 
+                           ifelse(test$p.value < 0.05, "**", 
+                                  ifelse(test$p.value < 0.1, "*", "")))
+  )
+})
+
+# Organizar por categorías para el anexo
+categorias_anexo <- list(
+  "Vivienda" = c("tiene_vivienda", "cuartos_dormir", "prop_cuartos_dormir"),
+  "Composición Familiar" = c("bin_headWoman", "bin_occupiedHead"),
+  "Educación Detallada" = c("max_educacion", "num_sin_educacion", "num_educacion_media", 
+                            "num_educacion_superior"),
+  "Empleo Detallado" = c("num_occupied", "num_inactivos", "prop_inactivos", 
+                         "num_trabajadores_tiempo_completo", "num_trabajadores_medio_tiempo",
+                         "num_empleados_informales", "num_independientes", "num_patrones",
+                         "num_trabajadores_domesticos"),
+  "Seguridad Social Detallada" = c("num_salud_subsidiado", "num_sin_salud"),
+  "Búsqueda de Empleo" = c("num_buscando_trabajo", "num_disponibles_trabajar", 
+                           "num_quieren_mas_horas"),
+  "Subsidios" = c("num_recibe_subsidio_transporte", "num_recibe_subsidio_familiar",
+                  "num_recibe_subsidio_educativo"),
+  "Ingresos Adicionales" = c("num_ingreso_horas_extra", "num_ingreso_bonificaciones",
+                             "num_ingreso_primas"),
+  "Estabilidad Laboral" = c("num_empleados_estables", "num_empresas_grandes", 
+                            "num_empresas_pequenas"),
+  "Sector Económico" = c("num_agricultura", "num_industria"),
+  "Índices" = c("vulnerability_index")
+)
+
+# Imprimir resultados organizados por categorías
+for(categoria in names(categorias_anexo)) {
+  vars_categoria <- categorias_anexo[[categoria]]
+  
+  tabla_categoria <- anexo_completo %>%
+    filter(variable %in% vars_categoria) %>%
+    select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia)
+  
+  cat("\n", paste0("=== ", categoria, " ==="), "\n")
+  print(tabla_categoria)
+  cat("Número de variables:", nrow(tabla_categoria), "\n")
+}
+
+# También mostrar todas las variables del anexo en una sola tabla
+cat("\n=== TODAS LAS VARIABLES DEL ANEXO ===\n")
+print(anexo_completo %>% arrange(desc(abs(diferencia))))
+
+# Verificar que no nos faltó ninguna variable
+variables_procesadas <- c(variables_principales, anexo_completo$variable)
+variables_faltantes <- setdiff(todas_variables, variables_procesadas)
+
+cat("\n=== VERIFICACIÓN ===\n")
+cat("Variables procesadas:", length(variables_procesadas), "\n")
+cat("Variables en dataset:", length(todas_variables), "\n")
+cat("Variables faltantes:", length(variables_faltantes), "\n")
+if(length(variables_faltantes) > 0) {
+  cat("Variables que faltan:", paste(variables_faltantes, collapse = ", "), "\n")
+}
+
+
+# CÓDIGO CORREGIDO PARA DESCRIPTIVAS
+library(tidyverse)
+
+# Calcular estadísticas básicas directamente
+descriptivas_simples <- train_enriched_final %>%
+  select(-id) %>%
+  group_by(Pobre) %>%
+  summarise(across(where(is.numeric), 
+                   list(media = ~mean(., na.rm = TRUE)), 
+                   .names = "{.col}")) %>%
+  pivot_longer(cols = -Pobre, names_to = "variable", values_to = "media") %>%
+  pivot_wider(names_from = Pobre, values_from = media, names_prefix = "media_")
+
+# Calcular diferencias con prueba t
+diferencias <- map_dfr(names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric))), 
+                       function(var) {
+                         formula <- as.formula(paste(var, "~ Pobre"))
+                         test <- t.test(formula, data = train_enriched_final)
+                         
+                         data.frame(
+                           variable = var,
+                           media_total = mean(train_enriched_final[[var]], na.rm = TRUE),
+                           media_nopobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE),
+                           media_pobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE),
+                           diferencia = diff(test$estimate),
+                           p_valor = test$p.value,
+                           significancia = ifelse(test$p.value < 0.01, "***", 
+                                                  ifelse(test$p.value < 0.05, "**", 
+                                                         ifelse(test$p.value < 0.1, "*", "")))
+                         )
+                       })
+
+# Mostrar resultados en consola
+cat("=== VARIABLES MÁS RELEVANTES ===\n")
+print(diferencias %>% 
+        arrange(desc(abs(diferencia))) %>%
+        select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia) %>%
+        head(20))
+
+# Mostrar por categorías específicas
+cat("\n=== VARIABLES DEMOGRÁFICAS ===\n")
+demograficas <- c("Nper", "num_women", "num_minors", "edad_promedio", "edad_jefe_hogar")
+print(diferencias %>% filter(variable %in% demograficas))
+
+cat("\n=== VARIABLES EDUCACIÓN ===\n")
+educacion <- c("cat_maxEduc", "promedio_educacion", "max_educacion", "educacion_jefe")
+print(diferencias %>% filter(variable %in% educacion))
+
+cat("\n=== VARIABLES EMPLEO ===\n")
+empleo <- c("prop_ocupados", "prop_inactivos", "num_empleados_formales", "num_empleados_informales")
+print(diferencias %>% filter(variable %in% empleo))
+
+cat("\n=== VARIABLES SEGURIDAD SOCIAL ===\n")
+ss <- c("prop_cotizantes", "num_salud_contributivo", "num_salud_subsidiado")
+print(diferencias %>% filter(variable %in% ss))
+
+cat("\n=== VARIABLES VIVIENDA ===\n")
+vivienda <- c("prop_cuartos", "n_cuartos", "bin_rent")
+print(diferencias %>% filter(variable %in% vivienda))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 3.2.11 Otros modelos entrenados: Reg Log, Naive Bayes, Elastic Net, RF, XGBoost ====
 
 
@@ -1874,7 +2146,7 @@ best_name <- perf$name[best_idx]
 best_thr <- perf$thr[best_idx]
 best_model_object_opt <- successful_models_opt[[best_name]] # El mejor modelo, ya entrenado
 
-cat(sprintf("🥇 Mejor modelo: %s | Umbral Óptimo=%.3f | F1 en Holdout=%.4f\n", best_name, best_thr, perf$F1[best_idx]))
+cat(sprintf(" Mejor modelo: %s | Umbral Óptimo=%.3f | F1 en Holdout=%.4f\n", best_name, best_thr, perf$F1[best_idx]))
 
 
 # <<< MODIFICACIÓN: NUEVO PASO 11 (Predicción con Mejor Modelo y Umbral) >>>
@@ -1947,292 +2219,11 @@ if(nrow(topk) > 0) {
   submission_ens <- tibble(id = test$id, Pobre = ens_pred)
   out_ens <- sprintf("predicciones_ENSAMBLE_Top%d_thr%.2f.csv", nrow(topk), ens_thr)
   readr::write_csv(submission_ens, out_ens)
-  cat(sprintf("\n✅ ¡LISTO (Ensamble)! Archivo guardado: %s | Pobres=%d/%d\n", out_ens, sum(submission_ens$Pobre), nrow(submission_ens)))
+  cat(sprintf("\nLISTO (Ensamble)! Archivo guardado: %s | Pobres=%d/%d\n", out_ens, sum(submission_ens$Pobre), nrow(submission_ens)))
   
 } else {
-  cat("\n⚠️ No se pudo generar ensamble (no hay modelos válidos en topk).\n")
+  cat("\n No se pudo generar ensamble (no hay modelos válidos en topk).\n")
 }
-
-# --- FIN DEL SCRIPT ---
-cat("\n--- Script Finalizado ---\n")
-
-
-
-
-
-
-
-
-
-
-
-# 4. Sección de análisis de datos para modelo final =============
-
-p_load(broom, ggplot2)
-
-# Estadísticas descriptivas por grupo de pobreza
-estadisticas <- train %>%
-  group_by(Pobre) %>%
-  summarise(
-    Nper_mean = mean(Nper, na.rm = TRUE),
-    prop_ocupados_mean = mean(prop_ocupados, na.rm = TRUE),
-    prop_inactivos_mean = mean(prop_inactivos, na.rm = TRUE),
-    prop_cotizantes_mean = mean(prop_cotizantes, na.rm = TRUE),
-    cat_maxEduc_mean = mean(cat_maxEduc, na.rm = TRUE),
-    prop_cuartos_mean = mean(prop_cuartos, na.rm = TRUE)
-  )
-
-# Promedios totales
-totales <- train %>%
-  summarise(
-    Nper_total = mean(Nper, na.rm = TRUE),
-    prop_ocupados_total = mean(prop_ocupados, na.rm = TRUE),
-    prop_inactivos_total = mean(prop_inactivos, na.rm = TRUE),
-    prop_cotizantes_total = mean(prop_cotizantes, na.rm = TRUE),
-    cat_maxEduc_total = mean(cat_maxEduc, na.rm = TRUE),
-    prop_cuartos_total = mean(prop_cuartos, na.rm = TRUE)
-  )
-
-# 3. Pruebas de significancia (t-test)
-variables_test <- c("Nper", "prop_ocupados", "prop_inactivos", 
-                    "prop_cotizantes", "cat_maxEduc", "prop_cuartos")
-
-pruebas_significancia <- list()
-for(var in variables_test) {
-  formula <- as.formula(paste(var, "~ Pobre"))
-  prueba <- t.test(formula, data = train)
-  pruebas_significancia[[var]] <- tidy(prueba)
-}
-
-# 4. Resultados para exportar
-estadisticas
-totales
-pruebas_significancia
-
-# Variable objetivo:
-# Calcular frecuencias y porcentajes
-frecuencias <- table(train$Pobre)
-porcentajes <- prop.table(frecuencias) * 100
-
-# Crear etiquetas para las barras
-# Modificar solo esta línea:
-etiquetas <- paste0(format(frecuencias, big.mark = ".", decimal.mark = ","), 
-                    "\n(", round(porcentajes, 1), "%)")
-# Gráfico con frecuencias y porcentajes
-barplot(frecuencias,
-        main = "Distribución de la Variable Objetivo: Pobreza",
-        xlab = "Condición de Pobreza", 
-        ylab = "Número de Hogares",
-        col = c("gray70", "gray40"),
-        names.arg = c("No Pobre (0)", "Pobre (1) "),
-        ylim = c(0, max(frecuencias) * 1.1),
-        border = "black")
-
-# Agregar etiquetas encima de las barras
-text(x = c(0.7, 1.9), 
-     y = frecuencias + max(frecuencias) * 0.05,
-     labels = etiquetas,
-     cex = 0.8)
-
-
-
-
-
-
-
-
-
-
-
-
-# CÓDIGO PARA ESTADÍSTICAS COMPLETAS (ANEXO)
-library(tidyverse)
-
-# Lista de las 20 variables principales que ya tenemos
-variables_principales <- c("max_tiempo_empresa", "total_horas_trabajo", "edad_minima", 
-                           "promedio_tiempo_empresa", "edad_promedio", "rango_edad",
-                           "horas_promedio_trabajo", "edad_jefe_hogar", "edad_maxima",
-                           "num_salud_especial", "Nper", "num_salud_contributivo",
-                           "num_educacion_basica", "num_sin_salud", "promedio_educacion",
-                           "Nivel_educ", "educacion_jefe", "num_servicios", "num_women", 
-                           "num_cotizantes")
-
-# Obtener todas las variables del dataset
-todas_variables <- names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric)))
-
-# Filtrar las variables que NO están en las principales
-variables_anexo <- setdiff(todas_variables, variables_principales)
-
-cat("=== VARIABLES PARA EL ANEXO (", length(variables_anexo), " variables) ===\n")
-
-# Calcular estadísticas para las variables del anexo
-anexo_completo <- map_dfr(variables_anexo, function(var) {
-  formula <- as.formula(paste(var, "~ Pobre"))
-  test <- t.test(formula, data = train_enriched_final)
-  
-  data.frame(
-    variable = var,
-    media_total = round(mean(train_enriched_final[[var]], na.rm = TRUE), 3),
-    media_nopobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE), 3),
-    media_pobres = round(mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE), 3),
-    diferencia = round(diff(test$estimate), 3),
-    p_valor = test$p.value,
-    significancia = ifelse(test$p.value < 0.01, "***", 
-                           ifelse(test$p.value < 0.05, "**", 
-                                  ifelse(test$p.value < 0.1, "*", "")))
-  )
-})
-
-# Organizar por categorías para el anexo
-categorias_anexo <- list(
-  "Vivienda" = c("tiene_vivienda", "cuartos_dormir", "prop_cuartos_dormir"),
-  "Composición Familiar" = c("bin_headWoman", "bin_occupiedHead"),
-  "Educación Detallada" = c("max_educacion", "num_sin_educacion", "num_educacion_media", 
-                            "num_educacion_superior"),
-  "Empleo Detallado" = c("num_occupied", "num_inactivos", "prop_inactivos", 
-                         "num_trabajadores_tiempo_completo", "num_trabajadores_medio_tiempo",
-                         "num_empleados_informales", "num_independientes", "num_patrones",
-                         "num_trabajadores_domesticos"),
-  "Seguridad Social Detallada" = c("num_salud_subsidiado", "num_sin_salud"),
-  "Búsqueda de Empleo" = c("num_buscando_trabajo", "num_disponibles_trabajar", 
-                           "num_quieren_mas_horas"),
-  "Subsidios" = c("num_recibe_subsidio_transporte", "num_recibe_subsidio_familiar",
-                  "num_recibe_subsidio_educativo"),
-  "Ingresos Adicionales" = c("num_ingreso_horas_extra", "num_ingreso_bonificaciones",
-                             "num_ingreso_primas"),
-  "Estabilidad Laboral" = c("num_empleados_estables", "num_empresas_grandes", 
-                            "num_empresas_pequenas"),
-  "Sector Económico" = c("num_agricultura", "num_industria"),
-  "Índices" = c("vulnerability_index")
-)
-
-# Imprimir resultados organizados por categorías
-for(categoria in names(categorias_anexo)) {
-  vars_categoria <- categorias_anexo[[categoria]]
-  
-  tabla_categoria <- anexo_completo %>%
-    filter(variable %in% vars_categoria) %>%
-    select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia)
-  
-  cat("\n", paste0("=== ", categoria, " ==="), "\n")
-  print(tabla_categoria)
-  cat("Número de variables:", nrow(tabla_categoria), "\n")
-}
-
-# También mostrar todas las variables del anexo en una sola tabla
-cat("\n=== TODAS LAS VARIABLES DEL ANEXO ===\n")
-print(anexo_completo %>% arrange(desc(abs(diferencia))))
-
-# Verificar que no nos faltó ninguna variable
-variables_procesadas <- c(variables_principales, anexo_completo$variable)
-variables_faltantes <- setdiff(todas_variables, variables_procesadas)
-
-cat("\n=== VERIFICACIÓN ===\n")
-cat("Variables procesadas:", length(variables_procesadas), "\n")
-cat("Variables en dataset:", length(todas_variables), "\n")
-cat("Variables faltantes:", length(variables_faltantes), "\n")
-if(length(variables_faltantes) > 0) {
-  cat("Variables que faltan:", paste(variables_faltantes, collapse = ", "), "\n")
-}
-
-
-# CÓDIGO CORREGIDO PARA DESCRIPTIVAS
-library(tidyverse)
-
-# Calcular estadísticas básicas directamente
-descriptivas_simples <- train_enriched_final %>%
-  select(-id) %>%
-  group_by(Pobre) %>%
-  summarise(across(where(is.numeric), 
-                   list(media = ~mean(., na.rm = TRUE)), 
-                   .names = "{.col}")) %>%
-  pivot_longer(cols = -Pobre, names_to = "variable", values_to = "media") %>%
-  pivot_wider(names_from = Pobre, values_from = media, names_prefix = "media_")
-
-# Calcular diferencias con prueba t
-diferencias <- map_dfr(names(train_enriched_final %>% select(-id, -Pobre) %>% select(where(is.numeric))), 
-                       function(var) {
-                         formula <- as.formula(paste(var, "~ Pobre"))
-                         test <- t.test(formula, data = train_enriched_final)
-                         
-                         data.frame(
-                           variable = var,
-                           media_total = mean(train_enriched_final[[var]], na.rm = TRUE),
-                           media_nopobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "NoPobre"], na.rm = TRUE),
-                           media_pobres = mean(train_enriched_final[[var]][train_enriched_final$Pobre == "Pobre"], na.rm = TRUE),
-                           diferencia = diff(test$estimate),
-                           p_valor = test$p.value,
-                           significancia = ifelse(test$p.value < 0.01, "***", 
-                                                  ifelse(test$p.value < 0.05, "**", 
-                                                         ifelse(test$p.value < 0.1, "*", "")))
-                         )
-                       })
-
-# Mostrar resultados en consola
-cat("=== VARIABLES MÁS RELEVANTES ===\n")
-print(diferencias %>% 
-        arrange(desc(abs(diferencia))) %>%
-        select(variable, media_total, media_nopobres, media_pobres, diferencia, significancia) %>%
-        head(20))
-
-# Mostrar por categorías específicas
-cat("\n=== VARIABLES DEMOGRÁFICAS ===\n")
-demograficas <- c("Nper", "num_women", "num_minors", "edad_promedio", "edad_jefe_hogar")
-print(diferencias %>% filter(variable %in% demograficas))
-
-cat("\n=== VARIABLES EDUCACIÓN ===\n")
-educacion <- c("cat_maxEduc", "promedio_educacion", "max_educacion", "educacion_jefe")
-print(diferencias %>% filter(variable %in% educacion))
-
-cat("\n=== VARIABLES EMPLEO ===\n")
-empleo <- c("prop_ocupados", "prop_inactivos", "num_empleados_formales", "num_empleados_informales")
-print(diferencias %>% filter(variable %in% empleo))
-
-cat("\n=== VARIABLES SEGURIDAD SOCIAL ===\n")
-ss <- c("prop_cotizantes", "num_salud_contributivo", "num_salud_subsidiado")
-print(diferencias %>% filter(variable %in% ss))
-
-cat("\n=== VARIABLES VIVIENDA ===\n")
-vivienda <- c("prop_cuartos", "n_cuartos", "bin_rent")
-print(diferencias %>% filter(variable %in% vivienda))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
