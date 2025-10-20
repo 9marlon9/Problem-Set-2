@@ -7,15 +7,10 @@ p_load(readr,tidyverse,googledrive, skimr, naniar, dplyr, caret, themis, recipes
 
 
 ##Importación de datos desde dropbox##
-train_hogares <- read.csv("https://www.dropbox.com/scl/fi/y4gn7m3xc196b4t3muf50/train_hogares.csv?rlkey=pclg0plogyqvvio8qgzq8w478&st=ints36kh&dl=1") %>% 
-  clean_names()
-train_personas <- read.csv("https://www.dropbox.com/scl/fi/ztw34qzjaatqka2mqmop9/train_personas.csv?rlkey=cm1jj1wi2j5z8n2i21gwjnyec&st=saabj5rr&dl=1") %>% 
-  clean_names()
-test_personas <- read.csv("https://www.dropbox.com/scl/fi/llb9izc4i7ef11z5di92i/test_personas.csv?rlkey=vfaol826sceevmgg9ra6zvwe7&st=oxwg3o4x&dl=1") %>% 
-  clean_names()
-test_hogares <- read.csv("https://www.dropbox.com/scl/fi/rgox9tm1geg7js959rzza/test_hogares.csv?rlkey=5esm82u2z1lz7iidkhxcqgfvy&st=wrx2n2id&dl=1") %>% 
-  clean_names()
-
+train_hogares <- read_csv("https://www.dropbox.com/scl/fi/y4gn7m3xc196b4t3muf50/train_hogares.csv?rlkey=pclg0plogyqvvio8qgzq8w478&st=ints36kh&dl=1")  
+train_personas <- read_csv("https://www.dropbox.com/scl/fi/ztw34qzjaatqka2mqmop9/train_personas.csv?rlkey=cm1jj1wi2j5z8n2i21gwjnyec&st=saabj5rr&dl=1")  
+test_personas <- read_csv("https://www.dropbox.com/scl/fi/llb9izc4i7ef11z5di92i/test_personas.csv?rlkey=vfaol826sceevmgg9ra6zvwe7&st=oxwg3o4x&dl=1")  
+test_hogares <- read_csv("https://www.dropbox.com/scl/fi/rgox9tm1geg7js959rzza/test_hogares.csv?rlkey=5esm82u2z1lz7iidkhxcqgfvy&st=wrx2n2id&dl=1") 
 
 
 # 0.1 Selección de variables ============
@@ -302,7 +297,6 @@ train <- train |>
   )
 
 # 3. Modelo RF sin balanceo de muestras =================
-
 ctrl <- trainControl(
   method = "cv",
   number = 3,
