@@ -3,7 +3,7 @@
 # 0.Cargar datos  =========
 install.packages("pacman")
 library(pacman)
-p_load(readr,tidyverse, skimr, naniar, dplyr, caret, themis, recipes, janitor)
+p_load(readr,dplyr, skimr, naniar, caret, themis, recipes, janitor)
 
 ##Importación de datos desde dropbox##
 train_hogares <- read_csv("https://www.dropbox.com/scl/fi/y4gn7m3xc196b4t3muf50/train_hogares.csv?rlkey=pclg0plogyqvvio8qgzq8w478&st=ints36kh&dl=1")  
@@ -295,7 +295,14 @@ train <- train |>
   mutate(Pobre   = factor(Pobre,levels=c(0,1))
   )
 
+train <- train |> 
+  mutate(Pobre = factor(Pobre, 
+                        levels = c(0, 1),
+                        labels = c("NoPobre", "Pobre")))
+
 # 3. Modelo RF sin balanceo de muestras =================
+
+
 ctrl <- trainControl(
   method = "cv",
   number = 3,
