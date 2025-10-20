@@ -8,7 +8,7 @@ Una guía rápida para navegar el repositorio:
 
 *   `documents/`: Contiene el documento final del proyecto en formato PDF y Latex.
 *   `scripts/`: Alberga os scripts de análisis (R y Python).
-*   `stores/`: Las bases utilizadas en el script son llamadas directamente desde dropbox, por lo que esta carpeta no existe
+*   `stores/`: Las bases utilizadas en el script son llamadas directamente desde dropbox, por lo que esta carpeta no existe.
 *   `views/`: Contiene todas las figuras y tablas generadas por los scripts.
 
 ## Contribuciones
